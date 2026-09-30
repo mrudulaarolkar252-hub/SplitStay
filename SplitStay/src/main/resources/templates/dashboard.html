@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Expense Distributor</title>
+    <style>
+        * { box-sizing: border-box; font-family: sans-serif; }
+        body { background: #f4f6f8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #fff; padding: 16px; border-radius: 6px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+        .pos { color: green; font-weight: bold; }
+        .neg { color: red; font-weight: bold; }
+        .inline-form { display: flex; gap: 10px; align-items: center; }
+        input, select, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header card">
+        <h2>EXPENSE DISTRIBUTOR</h2>
+        <a href="/logout"><button style="background:#dc3545;">Logout</button></a>
+    </div>
+
+    <!-- Group Selection & Creation -->
+    <div class="card inline-form">
+        <form action="/" method="get" style="display:flex; gap:10px; flex:1;">
+            <label><strong>Group:</strong></label>
+            <select name="groupId" onchange="this.form.submit()">
+                <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}" th:selected="${currentGroup != null and g.id == currentGroup.id}"></option>
+            </select>
+        </form>
+        <form action="/groups/create" method="post" style="display:flex; gap:5px;">
+            <input type="text" name="name" placeholder="New Group Name" required>
+            <button type="submit" style="background:#6c757d;">+ Group</button>
+        </form>
+    </div>
+
+    <div th:if="${currentGroup}">
+        <!-- Member Addition -->
+        <div class="card">
+            <h3>Add Member</h3>
+            <form action="/members/add" method="post" class="inline-form">
+                <input type="hidden" name="groupId" th:value="${currentGroup.id}">
+                <input type="text" name="name" placeholder="Member Name" required>
+                <button type="submit">+ Add Member</button>
+            </form>
+        </div>
+
+        <!-- Members Table -->
+        <div class="card">
+            <h3>Members & Balances</h3>
+            <table>
+                <thead>
+                    <tr><th>Member</th><th>Paid</th><th>Balance</th></tr>
+                </thead>
+                <tbody>
+                    <tr th:each="m : ${memberStats}">
+                        <th:block th:with="bal=${m.balance}">
+                            <td th:text="${m.name}"></td>
+                            <td th:text="'₹' + ${#numbers.formatDecimal(m.paid, 1, 2)}"></td>
+                            <td th:class="${bal >= 0 ? 'pos' : 'neg'}" th:text="${(bal >= 0 ? '+' : '') + '₹' + #numbers.formatDecimal(bal, 1, 2)}"></td>
+                        </th:block>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Expense -->
+        <div class="card" th:if="${!currentGroup.members.isEmpty()}">
+            <h3>Add Expense</h3>
+            <form action="/expenses/add" method="post" style="display:grid; gap:10px; grid-template-columns: 1fr 1fr;">
+                <input type="hidden" name="groupId" th:value="${currentGroup.id}">
+                <input type="text" name="description" placeholder="Description" required>
+                <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required>
+                <select name="paidByMemberId" required>
+                    <option th:each="m : ${currentGroup.members}" th:value="${m.id}" th:text="${m.name}"></option>
+                </select>
+                <input type="date" name="date" required>
+                <button type="submit" style="grid-column: span 2;">Save Expense</button>
+            </form>
+        </div>
+
+        <!-- Expense History -->
+        <div class="card">
+            <h3>Expense History</h3>
+            <table>
+                <thead>
+                    <tr><th>Description</th><th>Amount</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    <tr th:each="e : ${currentGroup.expenses}">
+                        <td th:text="${e.description}"></td>
+                        <td th:text="'₹' + ${e.amount}"></td>
+                        <td th:text="${e.date}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

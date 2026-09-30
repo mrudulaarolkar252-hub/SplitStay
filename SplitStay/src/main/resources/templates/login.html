@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Login - Expense Distributor</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f6f8; padding: 40px; }
+        .card { max-width: 360px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        input, button { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
+        .error { color: red; font-size: 14px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>Expense Distributor</h2>
+    <p th:if="${error}" class="error" th:text="${error}"></p>
+    
+    <h3>Login</h3>
+    <form action="/login" method="post">
+        <input type="email" name="email" placeholder="Email" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+
+    <hr style="margin: 20px 0;">
+
+    <h3>Register</h3>
+    <form action="/register" method="post">
+        <input type="text" name="name" placeholder="Full Name" required>
+        <input type="email" name="email" placeholder="Email" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit" style="background:#28a745;">Register</button>
+    </form>
+</div>
+</body>
+</html>
