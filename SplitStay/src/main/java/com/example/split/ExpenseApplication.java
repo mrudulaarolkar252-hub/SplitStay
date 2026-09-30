@@ -80,6 +80,7 @@ class Expense {
     private BigDecimal amount;
     private Long paidByMemberId;
     private String date;
+    private boolean paid = false;
 
     public Long getId() { return id; }
     public String getDescription() { return description; }
@@ -90,6 +91,8 @@ class Expense {
     public void setPaidByMemberId(Long paidByMemberId) { this.paidByMemberId = paidByMemberId; }
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
+    public boolean isPaid() { return paid; }
+    public void setPaid(boolean paid) { this.paid = paid; }
 }
 
 // --- REPOSITORIES ---
@@ -99,6 +102,7 @@ interface UserRepository extends JpaRepository<User, Long> {
 interface GroupRepository extends JpaRepository<Group, Long> {
     List<Group> findByUserId(Long userId);
 }
+interface ExpenseRepository extends JpaRepository<Expense, Long> {}
 
 // --- MVC CONTROLLER ---
 @Controller
@@ -106,10 +110,12 @@ class WebController {
 
     private final UserRepository userRepo;
     private final GroupRepository groupRepo;
+    private final ExpenseRepository expenseRepo;
 
-    public WebController(UserRepository userRepo, GroupRepository groupRepo) {
+    public WebController(UserRepository userRepo, GroupRepository groupRepo, ExpenseRepository expenseRepo) {
         this.userRepo = userRepo;
         this.groupRepo = groupRepo;
+        this.expenseRepo = expenseRepo;
     }
 
     @GetMapping("/")
@@ -221,6 +227,25 @@ class WebController {
         e.setDate(date);
         g.getExpenses().add(e);
         groupRepo.save(g);
+        return "redirect:/?groupId=" + groupId;
+    }
+
+    @PostMapping("/expenses/toggle-paid")
+    public String togglePaid(@RequestParam Long expenseId, @RequestParam Long groupId) {
+        Expense expense = expenseRepo.findById(expenseId).orElse(null);
+        if (expense != null) {
+            expense.setPaid(!expense.isPaid());
+            expenseRepo.save(expense);
+        }
+        return "redirect:/?groupId=" + groupId;
+    }
+
+    @PostMapping("/expenses/clear")
+    public String clearExpenses(@RequestParam Long groupId) {
+        Group group = groupRepo.findById(groupId).orElse(null);
+        if (group != null) {
+            expenseRepo.deleteAll(group.getExpenses());
+        }
         return "redirect:/?groupId=" + groupId;
     }
 }
