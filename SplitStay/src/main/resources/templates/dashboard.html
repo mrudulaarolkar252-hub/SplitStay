@@ -15,6 +15,14 @@
         .inline-form { display: flex; gap: 10px; align-items: center; }
         input, select, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         button { background: #007bff; color: white; border: none; cursor: pointer; }
+        
+        /* Badges & Action Buttons */
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        .btn-clear { background: #dc3545; color: white; }
+        .btn-toggle { background: #17a2b8; color: white; }
     </style>
 </head>
 <body>
@@ -83,18 +91,51 @@
             </form>
         </div>
 
-        <!-- Expense History -->
+        <!-- Expense History with Clear & Paid Toggles -->
         <div class="card">
-            <h3>Expense History</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Expense History</h3>
+                <!-- Clear History Button -->
+                <form action="/expenses/clear" method="post" style="margin: 0;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}">
+                    <button type="submit" 
+                            class="btn-clear btn-sm" 
+                            onclick="return confirm('Are you sure you want to clear all expense history for this group?');">
+                        Clear Expense History
+                    </button>
+                </form>
+            </div>
             <table>
                 <thead>
-                    <tr><th>Description</th><th>Amount</th><th>Date</th></tr>
+                    <tr>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <tr th:each="e : ${currentGroup.expenses}">
                         <td th:text="${e.description}"></td>
                         <td th:text="'₹' + ${e.amount}"></td>
                         <td th:text="${e.date}"></td>
+                        <td>
+                            <!-- Paid / Pending Badge -->
+                            <span th:if="${e.paid}" class="badge badge-success">Paid</span>
+                            <span th:unless="${e.paid}" class="badge badge-warning">Pending</span>
+                        </td>
+                        <td>
+                            <!-- Toggle Paid Status Form -->
+                            <form action="/expenses/toggle-paid" method="post" style="margin: 0;">
+                                <input type="hidden" name="expenseId" th:value="${e.id}">
+                                <input type="hidden" name="groupId" th:value="${currentGroup.id}">
+                                <button type="submit" class="btn-toggle btn-sm"
+                                        th:text="${e.paid} ? 'Mark Pending' : 'Mark Paid'">
+                                    Toggle
+                                </button>
+                            </form>
+                        </td>
                     </tr>
                 </tbody>
             </table>
