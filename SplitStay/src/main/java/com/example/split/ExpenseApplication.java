@@ -80,7 +80,9 @@ class Expense {
     private BigDecimal amount;
     private Long paidByMemberId;
     private String date;
-    private boolean paid = false;
+
+    @Column(columnDefinition = "boolean default false")
+    private Boolean paid = false;
 
     public Long getId() { return id; }
     public String getDescription() { return description; }
@@ -91,8 +93,8 @@ class Expense {
     public void setPaidByMemberId(Long paidByMemberId) { this.paidByMemberId = paidByMemberId; }
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
-    public boolean isPaid() { return paid; }
-    public void setPaid(boolean paid) { this.paid = paid; }
+    public Boolean isPaid() { return paid != null && paid; }
+    public void setPaid(Boolean paid) { this.paid = paid; }
 }
 
 // --- REPOSITORIES ---
@@ -135,7 +137,7 @@ class WebController {
             model.addAttribute("currentGroup", currentGroup);
 
             double total = currentGroup.getExpenses().stream()
-                    .mapToDouble(e -> e.getAmount().doubleValue()).sum();
+                    .mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0.0).sum();
             int count = currentGroup.getMembers().size();
             double fairShare = count > 0 ? total / count : 0;
 
@@ -145,8 +147,8 @@ class WebController {
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
                 double paid = currentGroup.getExpenses().stream()
-                        .filter(e -> e.getPaidByMemberId().equals(m.getId()))
-                        .mapToDouble(e -> e.getAmount().doubleValue()).sum();
+                        .filter(e -> e.getPaidByMemberId() != null && e.getPaidByMemberId().equals(m.getId()))
+                        .mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0.0).sum();
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
@@ -225,6 +227,7 @@ class WebController {
         e.setAmount(amount);
         e.setPaidByMemberId(paidByMemberId);
         e.setDate(date);
+        e.setPaid(false);
         g.getExpenses().add(e);
         groupRepo.save(g);
         return "redirect:/?groupId=" + groupId;
