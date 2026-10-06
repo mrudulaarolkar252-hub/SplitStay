@@ -10,6 +10,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @SpringBootApplication
@@ -81,8 +82,9 @@ class Expense {
     private Long paidByMemberId;
     private String date;
 
-    @Column(columnDefinition = "boolean default false")
-    private Boolean paid = false;
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "expense_id")
+    private List<ExpenseShare> shares = new ArrayList<>();
 
     public Long getId() { return id; }
     public String getDescription() { return description; }
@@ -93,6 +95,23 @@ class Expense {
     public void setPaidByMemberId(Long paidByMemberId) { this.paidByMemberId = paidByMemberId; }
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
+    public List<ExpenseShare> getShares() { return shares; }
+}
+
+// Entity to track each individual member's share for an expense
+@Entity
+class ExpenseShare {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private Long owerMemberId; // Who owes money
+    private BigDecimal shareAmount;
+    private Boolean paid = false; // Whether this specific person has paid back
+
+    public Long getId() { return id; }
+    public Long getOwerMemberId() { return owerMemberId; }
+    public void setOwerMemberId(Long owerMemberId) { this.owerMemberId = owerMemberId; }
+    public BigDecimal getShareAmount() { return shareAmount; }
+    public void setShareAmount(BigDecimal shareAmount) { this.shareAmount = shareAmount; }
     public Boolean isPaid() { return paid != null && paid; }
     public void setPaid(Boolean paid) { this.paid = paid; }
 }
@@ -105,6 +124,7 @@ interface GroupRepository extends JpaRepository<Group, Long> {
     List<Group> findByUserId(Long userId);
 }
 interface ExpenseRepository extends JpaRepository<Expense, Long> {}
+interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long> {}
 
 // --- MVC CONTROLLER ---
 @Controller
@@ -113,11 +133,14 @@ class WebController {
     private final UserRepository userRepo;
     private final GroupRepository groupRepo;
     private final ExpenseRepository expenseRepo;
+    private final ExpenseShareRepository shareRepo;
 
-    public WebController(UserRepository userRepo, GroupRepository groupRepo, ExpenseRepository expenseRepo) {
+    public WebController(UserRepository userRepo, GroupRepository groupRepo, 
+                         ExpenseRepository expenseRepo, ExpenseShareRepository shareRepo) {
         this.userRepo = userRepo;
         this.groupRepo = groupRepo;
         this.expenseRepo = expenseRepo;
+        this.shareRepo = shareRepo;
     }
 
     @GetMapping("/")
@@ -136,24 +159,44 @@ class WebController {
 
             model.addAttribute("currentGroup", currentGroup);
 
-            double total = currentGroup.getExpenses().stream()
-                    .mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0.0).sum();
-            int count = currentGroup.getMembers().size();
-            double fairShare = count > 0 ? total / count : 0;
+            // Create Member ID to Name map for easy lookup in templates
+            Map<Long, String> memberNameMap = new HashMap<>();
+            for (Member m : currentGroup.getMembers()) {
+                memberNameMap.put(m.getId(), m.getName());
+            }
+            model.addAttribute("memberNameMap", memberNameMap);
 
-            model.addAttribute("totalExpenses", total);
-            model.addAttribute("fairShare", fairShare);
+            // Calculate live balances based on unpaid shares
+            Map<Long, Double> paidMap = new HashMap<>();
+            Map<Long, Double> oweMap = new HashMap<>();
+            for (Member m : currentGroup.getMembers()) {
+                paidMap.put(m.getId(), 0.0);
+                oweMap.put(m.getId(), 0.0);
+            }
+
+            for (Expense e : currentGroup.getExpenses()) {
+                if (e.getPaidByMemberId() != null) {
+                    double expenseTotal = e.getAmount() != null ? e.getAmount().doubleValue() : 0.0;
+                    paidMap.put(e.getPaidByMemberId(), paidMap.getOrDefault(e.getPaidByMemberId(), 0.0) + expenseTotal);
+                }
+                for (ExpenseShare share : e.getShares()) {
+                    if (!share.isPaid()) { // Only count if NOT paid yet
+                        double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
+                        oweMap.put(share.getOwerMemberId(), oweMap.getOrDefault(share.getOwerMemberId(), 0.0) + shareAmt);
+                    }
+                }
+            }
 
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
-                double paid = currentGroup.getExpenses().stream()
-                        .filter(e -> e.getPaidByMemberId() != null && e.getPaidByMemberId().equals(m.getId()))
-                        .mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0.0).sum();
+                double totalPaid = paidMap.getOrDefault(m.getId(), 0.0);
+                double totalOwed = oweMap.getOrDefault(m.getId(), 0.0);
+                
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
-                stat.put("paid", paid);
-                stat.put("balance", paid - fairShare);
+                stat.put("paid", totalPaid);
+                stat.put("balance", totalPaid - totalOwed); // Positive = needs to receive, Negative = owes
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
@@ -227,18 +270,33 @@ class WebController {
         e.setAmount(amount);
         e.setPaidByMemberId(paidByMemberId);
         e.setDate(date);
-        e.setPaid(false);
+
+        // Split cost equally among all group members
+        int memberCount = g.getMembers().size();
+        if (memberCount > 0) {
+            BigDecimal perPersonShare = amount.divide(BigDecimal.valueOf(memberCount), 2, RoundingMode.HALF_UP);
+            for (Member m : g.getMembers()) {
+                if (!m.getId().equals(paidByMemberId)) { // Create share entries for everyone except the payer
+                    ExpenseShare share = new ExpenseShare();
+                    share.setOwerMemberId(m.getId());
+                    share.setShareAmount(perPersonShare);
+                    share.setPaid(false);
+                    e.getShares().add(share);
+                }
+            }
+        }
+
         g.getExpenses().add(e);
         groupRepo.save(g);
         return "redirect:/?groupId=" + groupId;
     }
 
-    @PostMapping("/expenses/toggle-paid")
-    public String togglePaid(@RequestParam Long expenseId, @RequestParam Long groupId) {
-        Expense expense = expenseRepo.findById(expenseId).orElse(null);
-        if (expense != null) {
-            expense.setPaid(!expense.isPaid());
-            expenseRepo.save(expense);
+    @PostMapping("/shares/toggle-paid")
+    public String toggleSharePaid(@RequestParam Long shareId, @RequestParam Long groupId) {
+        ExpenseShare share = shareRepo.findById(shareId).orElse(null);
+        if (share != null) {
+            share.setPaid(!share.isPaid());
+            shareRepo.save(share);
         }
         return "redirect:/?groupId=" + groupId;
     }
