@@ -164,21 +164,32 @@ class WebController {
             }
             model.addAttribute("memberNameMap", memberNameMap);
 
-            Map<Long, Double> paidMap = new HashMap<>();
+            Map<Long, Double> totalSpentMap = new HashMap<>();
+            Map<Long, Double> toReceiveMap = new HashMap<>();
             Map<Long, Double> oweMap = new HashMap<>();
             for (Member m : currentGroup.getMembers()) {
-                paidMap.put(m.getId(), 0.0);
+                totalSpentMap.put(m.getId(), 0.0);
+                toReceiveMap.put(m.getId(), 0.0);
                 oweMap.put(m.getId(), 0.0);
             }
 
             for (Expense e : currentGroup.getExpenses()) {
-                if (e.getPaidByMemberId() != null) {
-                    double expenseTotal = e.getAmount() != null ? e.getAmount().doubleValue() : 0.0;
-                    paidMap.put(e.getPaidByMemberId(), paidMap.getOrDefault(e.getPaidByMemberId(), 0.0) + expenseTotal);
+                Long payerId = e.getPaidByMemberId();
+                if (payerId != null && e.getAmount() != null) {
+                    // Track total raw cash spent by this member
+                    totalSpentMap.put(payerId, totalSpentMap.getOrDefault(payerId, 0.0) + e.getAmount().doubleValue());
                 }
+
                 for (ExpenseShare share : e.getShares()) {
-                    if (!share.isPaid()) {
+                    if (!share.isPaid()) { // Only count unpaid shares towards active balances
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
+                        
+                        // Amount others still owe to the payer
+                        if (payerId != null) {
+                            toReceiveMap.put(payerId, toReceiveMap.getOrDefault(payerId, 0.0) + shareAmt);
+                        }
+                        
+                        // Amount this member still owes to payers
                         oweMap.put(share.getOwerMemberId(), oweMap.getOrDefault(share.getOwerMemberId(), 0.0) + shareAmt);
                     }
                 }
@@ -186,14 +197,16 @@ class WebController {
 
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
-                double totalPaid = paidMap.getOrDefault(m.getId(), 0.0);
-                double totalOwed = oweMap.getOrDefault(m.getId(), 0.0);
+                double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
+                double toReceive = toReceiveMap.getOrDefault(m.getId(), 0.0);
+                double toPay = oweMap.getOrDefault(m.getId(), 0.0);
+                double netBalance = toReceive - toPay;
                 
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
-                stat.put("paid", totalPaid);
-                stat.put("balance", totalPaid - totalOwed);
+                stat.put("paid", totalSpent); // Displays actual total spent (e.g., ₹500)
+                stat.put("balance", netBalance); // Displays net share (e.g., Gets back ₹400)
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
