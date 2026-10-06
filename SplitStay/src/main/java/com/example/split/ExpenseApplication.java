@@ -98,14 +98,13 @@ class Expense {
     public List<ExpenseShare> getShares() { return shares; }
 }
 
-// Entity to track each individual member's share for an expense
 @Entity
 class ExpenseShare {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long owerMemberId; // Who owes money
+    private Long owerMemberId;
     private BigDecimal shareAmount;
-    private Boolean paid = false; // Whether this specific person has paid back
+    private Boolean paid = false;
 
     public Long getId() { return id; }
     public Long getOwerMemberId() { return owerMemberId; }
@@ -159,14 +158,12 @@ class WebController {
 
             model.addAttribute("currentGroup", currentGroup);
 
-            // Create Member ID to Name map for easy lookup in templates
             Map<Long, String> memberNameMap = new HashMap<>();
             for (Member m : currentGroup.getMembers()) {
                 memberNameMap.put(m.getId(), m.getName());
             }
             model.addAttribute("memberNameMap", memberNameMap);
 
-            // Calculate live balances based on unpaid shares
             Map<Long, Double> paidMap = new HashMap<>();
             Map<Long, Double> oweMap = new HashMap<>();
             for (Member m : currentGroup.getMembers()) {
@@ -180,7 +177,7 @@ class WebController {
                     paidMap.put(e.getPaidByMemberId(), paidMap.getOrDefault(e.getPaidByMemberId(), 0.0) + expenseTotal);
                 }
                 for (ExpenseShare share : e.getShares()) {
-                    if (!share.isPaid()) { // Only count if NOT paid yet
+                    if (!share.isPaid()) {
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
                         oweMap.put(share.getOwerMemberId(), oweMap.getOrDefault(share.getOwerMemberId(), 0.0) + shareAmt);
                     }
@@ -196,7 +193,7 @@ class WebController {
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
                 stat.put("paid", totalPaid);
-                stat.put("balance", totalPaid - totalOwed); // Positive = needs to receive, Negative = owes
+                stat.put("balance", totalPaid - totalOwed);
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
@@ -271,12 +268,11 @@ class WebController {
         e.setPaidByMemberId(paidByMemberId);
         e.setDate(date);
 
-        // Split cost equally among all group members
         int memberCount = g.getMembers().size();
         if (memberCount > 0) {
             BigDecimal perPersonShare = amount.divide(BigDecimal.valueOf(memberCount), 2, RoundingMode.HALF_UP);
             for (Member m : g.getMembers()) {
-                if (!m.getId().equals(paidByMemberId)) { // Create share entries for everyone except the payer
+                if (!m.getId().equals(paidByMemberId)) {
                     ExpenseShare share = new ExpenseShare();
                     share.setOwerMemberId(m.getId());
                     share.setShareAmount(perPersonShare);
@@ -305,7 +301,8 @@ class WebController {
     public String clearExpenses(@RequestParam Long groupId) {
         Group group = groupRepo.findById(groupId).orElse(null);
         if (group != null) {
-            expenseRepo.deleteAll(group.getExpenses());
+            group.getExpenses().clear();
+            groupRepo.save(group);
         }
         return "redirect:/?groupId=" + groupId;
     }
