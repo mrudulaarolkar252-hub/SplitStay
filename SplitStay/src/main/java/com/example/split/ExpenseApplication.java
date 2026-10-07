@@ -165,12 +165,17 @@ class WebController {
             model.addAttribute("memberNameMap", memberNameMap);
 
             Map<Long, Double> totalSpentMap = new HashMap<>();
-            Map<Long, Double> toReceiveMap = new HashMap<>();
-            Map<Long, Double> oweMap = new HashMap<>();
             for (Member m : currentGroup.getMembers()) {
                 totalSpentMap.put(m.getId(), 0.0);
-                toReceiveMap.put(m.getId(), 0.0);
-                oweMap.put(m.getId(), 0.0);
+            }
+
+            // 1. Build Pairwise Debt Matrix: pairwiseDebts[debtorId][creditorId]
+            Map<Long, Map<Long, Double>> pairwiseDebts = new HashMap<>();
+            for (Member m1 : currentGroup.getMembers()) {
+                pairwiseDebts.put(m1.getId(), new HashMap<>());
+                for (Member m2 : currentGroup.getMembers()) {
+                    pairwiseDebts.get(m1.getId()).put(m2.getId(), 0.0);
+                }
             }
 
             for (Expense e : currentGroup.getExpenses()) {
@@ -180,13 +185,42 @@ class WebController {
                 }
 
                 for (ExpenseShare share : e.getShares()) {
-                    if (!share.isPaid()) {
+                    if (!share.isPaid() && payerId != null) {
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
+                        Long owerId = share.getOwerMemberId();
                         
-                        if (payerId != null) {
-                            toReceiveMap.put(payerId, toReceiveMap.getOrDefault(payerId, 0.0) + shareAmt);
+                        // Add to raw debt matrix: ower owes payer
+                        if (pairwiseDebts.containsKey(owerId) && pairwiseDebts.get(owerId).containsKey(payerId)) {
+                            double currentDebt = pairwiseDebts.get(owerId).get(payerId);
+                            pairwiseDebts.get(owerId).put(payerId, currentDebt + shareAmt);
                         }
-                        oweMap.put(share.getOwerMemberId(), oweMap.getOrDefault(share.getOwerMemberId(), 0.0) + shareAmt);
+                    }
+                }
+            }
+
+            // 2. Net out mutual debts between every pair of members
+            List<Member> memberList = currentGroup.getMembers();
+            Map<Long, Double> netBalanceMap = new HashMap<>();
+            for (Member m : memberList) {
+                netBalanceMap.put(m.getId(), 0.0);
+            }
+
+            for (int i = 0; i < memberList.size(); i++) {
+                for (int j = i + 1; j < memberList.size(); j++) {
+                    Long id1 = memberList.get(i).getId();
+                    Long id2 = memberList.get(j).getId();
+
+                    double debt1To2 = pairwiseDebts.get(id1).get(id2); // 1 owes 2
+                    double debt2To1 = pairwiseDebts.get(id2).get(id1); // 2 owes 1
+
+                    if (debt1To2 > debt2To1) {
+                        double net = debt1To2 - debt2To1; // id1 owes id2 net
+                        netBalanceMap.put(id1, netBalanceMap.get(id1) - net);
+                        netBalanceMap.put(id2, netBalanceMap.get(id2) + net);
+                    } else if (debt2To1 > debt1To2) {
+                        double net = debt2To1 - debt1To2; // id2 owes id1 net
+                        netBalanceMap.put(id2, netBalanceMap.get(id2) - net);
+                        netBalanceMap.put(id1, netBalanceMap.get(id1) + net);
                     }
                 }
             }
@@ -194,9 +228,7 @@ class WebController {
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
                 double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
-                double toReceive = toReceiveMap.getOrDefault(m.getId(), 0.0);
-                double toPay = oweMap.getOrDefault(m.getId(), 0.0);
-                double netBalance = toReceive - toPay;
+                double netBalance = netBalanceMap.getOrDefault(m.getId(), 0.0);
                 
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
@@ -270,14 +302,10 @@ class WebController {
     public String deleteMember(@RequestParam Long memberId, @RequestParam Long groupId) {
         Group g = groupRepo.findById(groupId).orElse(null);
         if (g != null) {
-            // Remove member from group list
             g.getMembers().removeIf(m -> m.getId().equals(memberId));
-            
-            // Clean up any shares or expenses associated with this member
             for (Expense e : g.getExpenses()) {
                 e.getShares().removeIf(s -> s.getOwerMemberId().equals(memberId));
             }
-            
             groupRepo.save(g);
         }
         return "redirect:/?groupId=" + groupId;
