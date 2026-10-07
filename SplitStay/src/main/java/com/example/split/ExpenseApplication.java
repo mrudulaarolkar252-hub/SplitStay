@@ -176,20 +176,16 @@ class WebController {
             for (Expense e : currentGroup.getExpenses()) {
                 Long payerId = e.getPaidByMemberId();
                 if (payerId != null && e.getAmount() != null) {
-                    // Track total raw cash spent by this member
                     totalSpentMap.put(payerId, totalSpentMap.getOrDefault(payerId, 0.0) + e.getAmount().doubleValue());
                 }
 
                 for (ExpenseShare share : e.getShares()) {
-                    if (!share.isPaid()) { // Only count unpaid shares towards active balances
+                    if (!share.isPaid()) {
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
                         
-                        // Amount others still owe to the payer
                         if (payerId != null) {
                             toReceiveMap.put(payerId, toReceiveMap.getOrDefault(payerId, 0.0) + shareAmt);
                         }
-                        
-                        // Amount this member still owes to payers
                         oweMap.put(share.getOwerMemberId(), oweMap.getOrDefault(share.getOwerMemberId(), 0.0) + shareAmt);
                     }
                 }
@@ -205,8 +201,8 @@ class WebController {
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
-                stat.put("paid", totalSpent); // Displays actual total spent (e.g., ₹500)
-                stat.put("balance", netBalance); // Displays net share (e.g., Gets back ₹400)
+                stat.put("paid", totalSpent);
+                stat.put("balance", netBalance);
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
@@ -267,6 +263,23 @@ class WebController {
         m.setName(name);
         g.getMembers().add(m);
         groupRepo.save(g);
+        return "redirect:/?groupId=" + groupId;
+    }
+
+    @PostMapping("/members/delete")
+    public String deleteMember(@RequestParam Long memberId, @RequestParam Long groupId) {
+        Group g = groupRepo.findById(groupId).orElse(null);
+        if (g != null) {
+            // Remove member from group list
+            g.getMembers().removeIf(m -> m.getId().equals(memberId));
+            
+            // Clean up any shares or expenses associated with this member
+            for (Expense e : g.getExpenses()) {
+                e.getShares().removeIf(s -> s.getOwerMemberId().equals(memberId));
+            }
+            
+            groupRepo.save(g);
+        }
         return "redirect:/?groupId=" + groupId;
     }
 
