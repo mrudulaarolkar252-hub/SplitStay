@@ -169,7 +169,7 @@ class WebController {
                 totalSpentMap.put(m.getId(), 0.0);
             }
 
-            // 1. Build Pairwise Debt Matrix: pairwiseDebts[debtorId][creditorId]
+            // 1. Build Pairwise Direct Debt Matrix: pairwiseDebts[owerId][creditorId]
             Map<Long, Map<Long, Double>> pairwiseDebts = new HashMap<>();
             for (Member m1 : currentGroup.getMembers()) {
                 pairwiseDebts.put(m1.getId(), new HashMap<>());
@@ -189,7 +189,6 @@ class WebController {
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
                         Long owerId = share.getOwerMemberId();
                         
-                        // Add to raw debt matrix: ower owes payer
                         if (pairwiseDebts.containsKey(owerId) && pairwiseDebts.get(owerId).containsKey(payerId)) {
                             double currentDebt = pairwiseDebts.get(owerId).get(payerId);
                             pairwiseDebts.get(owerId).put(payerId, currentDebt + shareAmt);
@@ -198,12 +197,14 @@ class WebController {
                 }
             }
 
-            // 2. Net out mutual debts between every pair of members
+            // 2. Net mutual debts directly between pairs (e.g. A <-> B)
             List<Member> memberList = currentGroup.getMembers();
-            Map<Long, Double> netBalanceMap = new HashMap<>();
+            Map<Long, Double> finalNetBalanceMap = new HashMap<>();
             for (Member m : memberList) {
-                netBalanceMap.put(m.getId(), 0.0);
+                finalNetBalanceMap.put(m.getId(), 0.0);
             }
+
+            List<String> settlementStatements = new ArrayList<>();
 
             for (int i = 0; i < memberList.size(); i++) {
                 for (int j = i + 1; j < memberList.size(); j++) {
@@ -214,13 +215,15 @@ class WebController {
                     double debt2To1 = pairwiseDebts.get(id2).get(id1); // 2 owes 1
 
                     if (debt1To2 > debt2To1) {
-                        double net = debt1To2 - debt2To1; // id1 owes id2 net
-                        netBalanceMap.put(id1, netBalanceMap.get(id1) - net);
-                        netBalanceMap.put(id2, netBalanceMap.get(id2) + net);
+                        double net = debt1To2 - debt2To1;
+                        finalNetBalanceMap.put(id1, finalNetBalanceMap.get(id1) - net);
+                        finalNetBalanceMap.put(id2, finalNetBalanceMap.get(id2) + net);
+                        settlementStatements.add(memberNameMap.get(id1) + " owes " + memberNameMap.get(id2) + " ₹" + String.format("%.2f", net));
                     } else if (debt2To1 > debt1To2) {
-                        double net = debt2To1 - debt1To2; // id2 owes id1 net
-                        netBalanceMap.put(id2, netBalanceMap.get(id2) - net);
-                        netBalanceMap.put(id1, netBalanceMap.get(id1) + net);
+                        double net = debt2To1 - debt1To2;
+                        finalNetBalanceMap.put(id2, finalNetBalanceMap.get(id2) - net);
+                        finalNetBalanceMap.put(id1, finalNetBalanceMap.get(id1) + net);
+                        settlementStatements.add(memberNameMap.get(id2) + " owes " + memberNameMap.get(id1) + " ₹" + String.format("%.2f", net));
                     }
                 }
             }
@@ -228,16 +231,17 @@ class WebController {
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
                 double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
-                double netBalance = netBalanceMap.getOrDefault(m.getId(), 0.0);
+                double balance = finalNetBalanceMap.getOrDefault(m.getId(), 0.0);
                 
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
                 stat.put("paid", totalSpent);
-                stat.put("balance", netBalance);
+                stat.put("balance", balance);
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
+            model.addAttribute("settlements", settlementStatements);
         }
 
         return "dashboard";
