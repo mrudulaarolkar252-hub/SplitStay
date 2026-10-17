@@ -1,401 +1,288 @@
-package com.example.split;
-
-import jakarta.persistence.*;
-import jakarta.servlet.http.HttpSession;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.*;
-
-@SpringBootApplication
-public class ExpenseApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(ExpenseApplication.class, args);
-    }
-}
-
-// --- ENTITIES ---
-@Entity @Table(name = "users")
-class User {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String name;
-    @Column(unique = true) private String email;
-    private String password;
-
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-}
-
-@Entity @Table(name = "expense_groups")
-class Group {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String name;
-    private Long userId;
-
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "group_id")
-    private List<Member> members = new ArrayList<>();
-
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "group_id")
-    private List<Expense> expenses = new ArrayList<>();
-
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-    public List<Member> getMembers() { return members; }
-    public List<Expense> getExpenses() { return expenses; }
-}
-
-@Entity
-class Member {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String name;
-
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-}
-
-@Entity
-class Expense {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String description;
-    private BigDecimal amount;
-    private Long paidByMemberId;
-    private String date;
-
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "expense_id")
-    private List<ExpenseShare> shares = new ArrayList<>();
-
-    public Long getId() { return id; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public Long getPaidByMemberId() { return paidByMemberId; }
-    public void setPaidByMemberId(Long paidByMemberId) { this.paidByMemberId = paidByMemberId; }
-    public String getDate() { return date; }
-    public void setDate(String date) { this.date = date; }
-    public List<ExpenseShare> getShares() { return shares; }
-}
-
-@Entity
-class ExpenseShare {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private Long owerMemberId;
-    private BigDecimal shareAmount;
-    private Boolean paid = false;
-
-    public Long getId() { return id; }
-    public Long getOwerMemberId() { return owerMemberId; }
-    public void setOwerMemberId(Long owerMemberId) { this.owerMemberId = owerMemberId; }
-    public BigDecimal getShareAmount() { return shareAmount; }
-    public void setShareAmount(BigDecimal shareAmount) { this.shareAmount = shareAmount; }
-    public Boolean isPaid() { return paid != null && paid; }
-    public void setPaid(Boolean paid) { this.paid = paid; }
-}
-
-// --- REPOSITORIES ---
-interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByEmail(String email);
-}
-interface GroupRepository extends JpaRepository<Group, Long> {
-    List<Group> findByUserId(Long userId);
-}
-interface ExpenseRepository extends JpaRepository<Expense, Long> {}
-interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long> {}
-
-// --- MVC CONTROLLER ---
-@Controller
-class WebController {
-
-    private final UserRepository userRepo;
-    private final GroupRepository groupRepo;
-    private final ExpenseRepository expenseRepo;
-    private final ExpenseShareRepository shareRepo;
-
-    public WebController(UserRepository userRepo, GroupRepository groupRepo, 
-                         ExpenseRepository expenseRepo, ExpenseShareRepository shareRepo) {
-        this.userRepo = userRepo;
-        this.groupRepo = groupRepo;
-        this.expenseRepo = expenseRepo;
-        this.shareRepo = shareRepo;
-    }
-
-    @GetMapping("/")
-    public String index(HttpSession session, @RequestParam(required = false) Long groupId, Model model) {
-        User user = (User) session.getAttribute("user");
-        if (user == null) return "redirect:/login";
-
-        List<Group> groups = groupRepo.findByUserId(user.getId());
-        model.addAttribute("user", user);
-        model.addAttribute("groups", groups);
-
-        if (!groups.isEmpty()) {
-            Group currentGroup = (groupId != null) 
-                ? groupRepo.findById(groupId).orElse(groups.get(0)) 
-                : groups.get(0);
-
-            model.addAttribute("currentGroup", currentGroup);
-
-            Map<Long, String> memberNameMap = new HashMap<>();
-            for (Member m : currentGroup.getMembers()) {
-                memberNameMap.put(m.getId(), m.getName());
-            }
-            model.addAttribute("memberNameMap", memberNameMap);
-
-            Map<Long, Double> totalSpentMap = new HashMap<>();
-            for (Member m : currentGroup.getMembers()) {
-                totalSpentMap.put(m.getId(), 0.0);
-            }
-
-            // Matrix: pairwiseDebts[owerId][payerId] = total unpaid debt from ower to payer
-            Map<Long, Map<Long, Double>> pairwiseDebts = new HashMap<>();
-            for (Member m1 : currentGroup.getMembers()) {
-                pairwiseDebts.put(m1.getId(), new HashMap<>());
-                for (Member m2 : currentGroup.getMembers()) {
-                    pairwiseDebts.get(m1.getId()).put(m2.getId(), 0.0);
-                }
-            }
-
-            for (Expense e : currentGroup.getExpenses()) {
-                Long payerId = e.getPaidByMemberId();
-                if (payerId != null && e.getAmount() != null) {
-                    totalSpentMap.put(payerId, totalSpentMap.getOrDefault(payerId, 0.0) + e.getAmount().doubleValue());
-                }
-
-                for (ExpenseShare share : e.getShares()) {
-                    Long owerId = share.getOwerMemberId();
-                    if (!share.isPaid() && payerId != null && !owerId.equals(payerId)) {
-                        double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
-                        if (pairwiseDebts.containsKey(owerId) && pairwiseDebts.get(owerId).containsKey(payerId)) {
-                            double cur = pairwiseDebts.get(owerId).get(payerId);
-                            pairwiseDebts.get(owerId).put(payerId, cur + shareAmt);
-                        }
-                    }
-                }
-            }
-
-            List<Member> memberList = currentGroup.getMembers();
-            Map<Long, Double> totalOwedByMember = new HashMap<>();
-            Map<Long, Double> totalToReceiveByMember = new HashMap<>();
-
-            for (Member m : memberList) {
-                totalOwedByMember.put(m.getId(), 0.0);
-                totalToReceiveByMember.put(m.getId(), 0.0);
-            }
-
-            List<Map<String, Object>> settlementList = new ArrayList<>();
-
-            // Calculate pair-by-pair net offsets
-            for (int i = 0; i < memberList.size(); i++) {
-                for (int j = i + 1; j < memberList.size(); j++) {
-                    Long id1 = memberList.get(i).getId();
-                    Long id2 = memberList.get(j).getId();
-
-                    double debt1To2 = pairwiseDebts.get(id1).get(id2); // 1 owes 2
-                    double debt2To1 = pairwiseDebts.get(id2).get(id1); // 2 owes 1
-
-                    if (debt1To2 > debt2To1) {
-                        double net = debt1To2 - debt2To1;
-                        totalOwedByMember.put(id1, totalOwedByMember.get(id1) + net);
-                        totalToReceiveByMember.put(id2, totalToReceiveByMember.get(id2) + net);
-
-                        Map<String, Object> stmt = new HashMap<>();
-                        stmt.put("fromId", id1);
-                        stmt.put("fromName", memberNameMap.get(id1));
-                        stmt.put("toId", id2);
-                        stmt.put("toName", memberNameMap.get(id2));
-                        stmt.put("amount", net);
-                        settlementList.add(stmt);
-                    } else if (debt2To1 > debt1To2) {
-                        double net = debt2To1 - debt1To2;
-                        totalOwedByMember.put(id2, totalOwedByMember.get(id2) + net);
-                        totalToReceiveByMember.put(id1, totalToReceiveByMember.get(id1) + net);
-
-                        Map<String, Object> stmt = new HashMap<>();
-                        stmt.put("fromId", id2);
-                        stmt.put("fromName", memberNameMap.get(id2));
-                        stmt.put("toId", id1);
-                        stmt.put("toName", memberNameMap.get(id1));
-                        stmt.put("amount", net);
-                        settlementList.add(stmt);
-                    }
-                }
-            }
-
-            List<Map<String, Object>> memberStats = new ArrayList<>();
-            for (Member m : currentGroup.getMembers()) {
-                double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
-                double owed = totalOwedByMember.getOrDefault(m.getId(), 0.0);
-                double toReceive = totalToReceiveByMember.getOrDefault(m.getId(), 0.0);
-                double balance = toReceive - owed;
-
-                Map<String, Object> stat = new HashMap<>();
-                stat.put("id", m.getId());
-                stat.put("name", m.getName());
-                stat.put("paid", totalSpent);
-                stat.put("owed", owed);
-                stat.put("toReceive", toReceive);
-                stat.put("balance", balance);
-                memberStats.add(stat);
-            }
-            model.addAttribute("memberStats", memberStats);
-            model.addAttribute("settlements", settlementList);
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Expense Splitter Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
         }
-
-        return "dashboard";
-    }
-
-    @GetMapping("/login")
-    public String loginPage() { return "login"; }
-
-    @PostMapping("/login")
-    public String handleLogin(@RequestParam String email, @RequestParam String password, HttpSession session, Model model) {
-        Optional<User> userOpt = userRepo.findByEmail(email);
-        if (userOpt.isPresent() && userOpt.get().getPassword().equals(password)) {
-            session.setAttribute("user", userOpt.get());
-            return "redirect:/";
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-        model.addAttribute("error", "Invalid credentials!");
-        return "login";
-    }
-
-    @PostMapping("/register")
-    public String handleRegister(@RequestParam String name, @RequestParam String email, @RequestParam String password, Model model) {
-        if (userRepo.findByEmail(email).isPresent()) {
-            model.addAttribute("error", "Email already exists!");
-            return "login";
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(password);
-        userRepo.save(user);
-        return "redirect:/login";
-    }
-
-    @GetMapping("/logout")
-    public String logout(HttpSession session) {
-        session.invalidate();
-        return "redirect:/login";
-    }
-
-    @PostMapping("/groups/create")
-    public String createGroup(@RequestParam String name, HttpSession session) {
-        User user = (User) session.getAttribute("user");
-        if (user == null) return "redirect:/login";
-        Group g = new Group();
-        g.setName(name);
-        g.setUserId(user.getId());
-        groupRepo.save(g);
-        return "redirect:/";
-    }
-
-    @PostMapping("/members/add")
-    public String addMember(@RequestParam Long groupId, @RequestParam String name) {
-        Group g = groupRepo.findById(groupId).orElseThrow();
-        Member m = new Member();
-        m.setName(name);
-        g.getMembers().add(m);
-        groupRepo.save(g);
-        return "redirect:/?groupId=" + groupId;
-    }
-
-    @PostMapping("/members/delete")
-    public String deleteMember(@RequestParam Long memberId, @RequestParam Long groupId) {
-        Group g = groupRepo.findById(groupId).orElse(null);
-        if (g != null) {
-            g.getMembers().removeIf(m -> m.getId().equals(memberId));
-            for (Expense e : g.getExpenses()) {
-                e.getShares().removeIf(s -> s.getOwerMemberId().equals(memberId));
-            }
-            groupRepo.save(g);
+        .header h1 { margin: 0; font-size: 24px; color: #2c3e50; }
+        .logout-btn {
+            background-color: #e74c3c;
+            color: white;
+            padding: 8px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
         }
-        return "redirect:/?groupId=" + groupId;
-    }
-
-    @PostMapping("/expenses/add")
-    public String addExpense(@RequestParam Long groupId, @RequestParam String description, 
-                             @RequestParam BigDecimal amount, @RequestParam Long paidByMemberId, 
-                             @RequestParam String date) {
-        Group g = groupRepo.findById(groupId).orElseThrow();
-        Expense e = new Expense();
-        e.setDescription(description);
-        e.setAmount(amount);
-        e.setPaidByMemberId(paidByMemberId);
-        e.setDate(date);
-
-        int memberCount = g.getMembers().size();
-        if (memberCount > 0) {
-            BigDecimal perPersonShare = amount.divide(BigDecimal.valueOf(memberCount), 2, RoundingMode.HALF_UP);
-            for (Member m : g.getMembers()) {
-                if (!m.getId().equals(paidByMemberId)) {
-                    ExpenseShare share = new ExpenseShare();
-                    share.setOwerMemberId(m.getId());
-                    share.setShareAmount(perPersonShare);
-                    share.setPaid(false);
-                    e.getShares().add(share);
-                }
-            }
+        .group-selector {
+            margin-bottom: 25px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
-
-        g.getExpenses().add(e);
-        groupRepo.save(g);
-        return "redirect:/?groupId=" + groupId;
-    }
-
-    @PostMapping("/settle")
-    public String settleDebt(@RequestParam Long groupId, @RequestParam Long fromMemberId, 
-                             @RequestParam Long toMemberId, @RequestParam BigDecimal amount) {
-        Group g = groupRepo.findById(groupId).orElse(null);
-        if (g != null) {
-            // Record settlement as a balancing expense item paid by debtor to creditor
-            Expense settlement = new Expense();
-            settlement.setDescription("Settlement Payment");
-            settlement.setAmount(amount);
-            settlement.setPaidByMemberId(fromMemberId);
-            settlement.setDate(java.time.LocalDate.now().toString());
-
-            ExpenseShare share = new ExpenseShare();
-            share.setOwerMemberId(toMemberId);
-            share.setShareAmount(amount);
-            share.setPaid(false);
-            settlement.getShares().add(share);
-
-            g.getExpenses().add(settlement);
-            groupRepo.save(g);
+        select, input[type="text"], input[type="number"], input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
         }
-        return "redirect:/?groupId=" + groupId;
-    }
-
-    @PostMapping("/expenses/clear")
-    public String clearExpenses(@RequestParam Long groupId) {
-        Group group = groupRepo.findById(groupId).orElse(null);
-        if (group != null) {
-            group.getExpenses().clear();
-            groupRepo.save(group);
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
         }
-        return "redirect:/?groupId=" + groupId;
-    }
-}
+        .btn:hover { background-color: #2980b9; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-danger { background-color: #e74c3c; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .card {
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .card h3 { margin-top: 0; color: #34495e; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        th { background-color: #f8f9fa; }
+        .badge-positive { color: #27ae60; font-weight: bold; }
+        .badge-negative { color: #e74c3c; font-weight: bold; }
+        .badge-neutral { color: #7f8c8d; }
+        .btn-remove {
+            color: #e74c3c;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .btn-remove:hover { text-decoration: underline; }
+        .settlement-box {
+            background: #e8f8f5;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+        }
+        .settlement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px dashed #a3e4d7;
+        }
+        .settlement-item:last-child { border-bottom: none; }
+        .expense-item {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #fff;
+        }
+        .expense-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .share-list { margin-top: 8px; padding-left: 15px; font-size: 13px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Expense Splitter</h1>
+        <div>
+            <span>Welcome, <b th:text="${user.name}">User</b>!</span>
+            <a href="/logout" class="logout-btn" style="margin-left: 15px;">Logout</a>
+        </div>
+    </div>
+
+    <!-- Group Selector -->
+    <div class="group-selector">
+        <form th:action="@{/}" method="get">
+            <label for="groupSelect"><b>Select Group:</b></label>
+            <select id="groupSelect" name="groupId" onchange="this.form.submit()">
+                <option th:each="g : ${groups}" 
+                        th:value="${g.id}" 
+                        th:text="${g.name}" 
+                        th:selected="${currentGroup != null and g.id == currentGroup.id}">
+                </option>
+            </select>
+        </form>
+
+        <form th:action="@{/groups/create}" method="post" style="display: flex; gap: 5px; margin-left: 20px;">
+            <input type="text" name="name" placeholder="New Group Name" required />
+            <button type="submit" class="btn">+ Create Group</button>
+        </form>
+    </div>
+
+    <div th:if="${currentGroup != null}">
+        
+        <!-- Members & Settlement Plan Section -->
+        <div class="settlement-box" th:if="${not #lists.isEmpty(settlements)}">
+            <h3 style="margin: 0 0 10px 0; color: #2e7d32;">Suggested Pairwise Settlements:</h3>
+            <div th:each="s : ${settlements}" class="settlement-item">
+                <span>
+                    <b th:text="${s.fromName}">Debtor</b> owes <b th:text="${s.toName}">Creditor</b>: 
+                    <span style="color: #27ae60;" th:text="'₹' + ${#numbers.formatDecimal(s.amount, 1, 2)}">₹0.00</span>
+                </span>
+                <!-- Mark Paid Button moved here -->
+                <form th:action="@{/settle}" method="post" style="margin: 0;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                    <input type="hidden" name="fromMemberId" th:value="${s.fromId}" />
+                    <input type="hidden" name="toMemberId" th:value="${s.toId}" />
+                    <input type="hidden" name="amount" th:value="${s.amount}" />
+                    <button type="submit" class="btn btn-success" style="padding: 4px 10px; font-size: 12px;">
+                        Mark Paid ✓
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Add Member Form -->
+            <div class="card">
+                <h3>Add Member</h3>
+                <form th:action="@{/members/add}" method="post" style="display: flex; gap: 8px;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                    <input type="text" name="name" placeholder="Member Name" required style="flex: 1;" />
+                    <button type="submit" class="btn">Add</button>
+                </form>
+            </div>
+
+            <!-- Add Expense Form -->
+            <div class="card">
+                <h3>Add Expense</h3>
+                <form th:action="@{/expenses/add}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                    <input type="text" name="description" placeholder="Description (e.g. Dinner)" required />
+                    <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required />
+                    <select name="paidByMemberId" required>
+                        <option value="" disabled selected>Who paid?</option>
+                        <option th:each="m : ${currentGroup.members}" th:value="${m.id}" th:text="${m.name}"></option>
+                    </select>
+                    <input type="date" name="date" required />
+                    <button type="submit" class="btn btn-success">Add Expense</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Members & Balances Table -->
+        <div class="card" style="margin-bottom: 25px;">
+            <h3>Members & Balances</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Member Name</th>
+                        <th>Total Paid Out-of-Pocket</th>
+                        <th>Net Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="stat : ${memberStats}">
+                        <td th:text="${stat.name}">Name</td>
+                        <td th:text="'₹' + ${#numbers.formatDecimal(stat.paid, 1, 2)}">₹0.00</td>
+                        <td>
+                            <span th:if="${stat.balance > 0}" class="badge-positive" th:text="'Gets back ₹' + ${#numbers.formatDecimal(stat.balance, 1, 2)}"></span>
+                            <span th:if="${stat.balance < 0}" class="badge-negative" th:text="'Owes ₹' + ${#numbers.formatDecimal(-stat.balance, 1, 2)}"></span>
+                            <span th:if="${stat.balance == 0}" class="badge-neutral">Settled up</span>
+                        </td>
+                        <td>
+                            <form th:action="@{/members/delete}" method="post" style="margin: 0;">
+                                <input type="hidden" name="memberId" th:value="${stat.id}" />
+                                <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                                <button type="submit" class="btn-remove" onclick="return confirm('Are you sure you want to remove this member?');">
+                                    ✖ Remove
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Clean Expense History (Read-Only) -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0;">Expense History</h3>
+                <form th:action="@{/expenses/clear}" method="post" style="margin: 0;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all expenses for this group?');">
+                        Clear History
+                    </button>
+                </form>
+            </div>
+
+            <div th:each="expense : ${currentGroup.expenses}" class="expense-item">
+                <div class="expense-header">
+                    <div>
+                        <span th:text="${expense.description}">Dinner</span>
+                        <span style="font-weight: normal; color: #7f8c8d; font-size: 13px;" th:text="'(' + ${expense.date} + ')'"></span>
+                    </div>
+                    <div th:text="'₹' + ${#numbers.formatDecimal(expense.amount, 1, 2)}">₹0.00</div>
+                </div>
+                <div style="font-size: 13px; color: #555;">
+                    Paid by: <b th:text="${memberNameMap.get(expense.paidByMemberId)}">Payer</b>
+                </div>
+
+                <div class="share-list">
+                    <div th:each="share : ${expense.shares}">
+                        • <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span> share: 
+                        <b th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}">₹0.00</b>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(currentGroup.expenses)}" style="text-align: center; color: #888; padding: 20px 0;">
+                No expenses logged yet for this group.
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
