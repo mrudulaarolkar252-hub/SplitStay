@@ -42,7 +42,7 @@
             gap: 10px;
             align-items: center;
         }
-        select, input[type="text"], input[type="email"], input[type="number"], input[type="date"] {
+        select, input[type="text"], input[type="number"], input[type="date"] {
             padding: 8px 12px;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -139,7 +139,7 @@
         </div>
     </div>
 
-    <!-- Select / Create Group -->
+    <!-- Group Selector -->
     <div class="group-selector">
         <form th:action="@{/}" method="get">
             <label for="groupSelect"><b>Select Group:</b></label>
@@ -160,45 +160,22 @@
 
     <div th:if="${currentGroup != null}">
         
-        <!-- Pending Settlement Confirmations Banner -->
-        <div class="card" th:if="${not #lists.isEmpty(pendingRequests)}" style="border-left: 4px solid #f39c12; margin-bottom: 20px; background-color: #fef9e7;">
-            <h3 style="color: #d35400; margin-top: 0;">Pending Settlement Confirmations</h3>
-            <div th:each="req : ${pendingRequests}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #f5b041;">
-                <span>
-                    <b th:text="${memberNameMap.get(req.fromMemberId)}">Member</b> marked payment of 
-                    <b style="color: #27ae60;" th:text="'₹' + ${#numbers.formatDecimal(req.amount, 1, 2)}">₹0.00</b> to 
-                    <b th:text="${memberNameMap.get(req.toMemberId)}">Recipient</b>.
-                </span>
-                <div style="display: flex; gap: 5px;">
-                    <form th:action="@{/settle/approve}" method="post">
-                        <input type="hidden" name="requestId" th:value="${req.id}" />
-                        <input type="hidden" name="approved" value="true" />
-                        <button type="submit" class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Confirm ✓</button>
-                    </form>
-                    <form th:action="@{/settle/approve}" method="post">
-                        <input type="hidden" name="requestId" th:value="${req.id}" />
-                        <input type="hidden" name="approved" value="false" />
-                        <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Reject ✖</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Direct Pairwise Settlement Plan -->
+        <!-- Members & Settlement Plan Section -->
         <div class="settlement-box" th:if="${not #lists.isEmpty(settlements)}">
-            <h3 style="margin: 0 0 10px 0; color: #2e7d32;">Pairwise Settlement Plan:</h3>
+            <h3 style="margin: 0 0 10px 0; color: #2e7d32;">Suggested Pairwise Settlements:</h3>
             <div th:each="s : ${settlements}" class="settlement-item">
                 <span>
                     <b th:text="${s.fromName}">Debtor</b> owes <b th:text="${s.toName}">Creditor</b>: 
                     <span style="color: #27ae60;" th:text="'₹' + ${#numbers.formatDecimal(s.amount, 1, 2)}">₹0.00</span>
                 </span>
-                <form th:action="@{/settle/request}" method="post" style="margin: 0;">
+                <!-- Mark Paid Button moved here -->
+                <form th:action="@{/settle}" method="post" style="margin: 0;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
                     <input type="hidden" name="fromMemberId" th:value="${s.fromId}" />
                     <input type="hidden" name="toMemberId" th:value="${s.toId}" />
                     <input type="hidden" name="amount" th:value="${s.amount}" />
                     <button type="submit" class="btn btn-success" style="padding: 4px 10px; font-size: 12px;">
-                        Mark Paid (Request Approval)
+                        Mark Paid ✓
                     </button>
                 </form>
             </div>
@@ -208,11 +185,10 @@
             <!-- Add Member Form -->
             <div class="card">
                 <h3>Add Member</h3>
-                <form th:action="@{/members/add}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
+                <form th:action="@{/members/add}" method="post" style="display: flex; gap: 8px;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
-                    <input type="text" name="name" placeholder="Member Name" required />
-                    <input type="email" name="email" placeholder="Member Email" required />
-                    <button type="submit" class="btn">Add Member</button>
+                    <input type="text" name="name" placeholder="Member Name" required style="flex: 1;" />
+                    <button type="submit" class="btn">Add</button>
                 </form>
             </div>
 
@@ -240,7 +216,6 @@
                 <thead>
                     <tr>
                         <th>Member Name</th>
-                        <th>Email</th>
                         <th>Total Paid Out-of-Pocket</th>
                         <th>Net Status</th>
                         <th>Action</th>
@@ -249,7 +224,6 @@
                 <tbody>
                     <tr th:each="stat : ${memberStats}">
                         <td th:text="${stat.name}">Name</td>
-                        <td th:text="${stat.email}" style="color: #7f8c8d; font-size: 13px;">email@domain.com</td>
                         <td th:text="'₹' + ${#numbers.formatDecimal(stat.paid, 1, 2)}">₹0.00</td>
                         <td>
                             <span th:if="${stat.balance > 0}" class="badge-positive" th:text="'Gets back ₹' + ${#numbers.formatDecimal(stat.balance, 1, 2)}"></span>
@@ -270,7 +244,7 @@
             </table>
         </div>
 
-        <!-- Clean Expense History Section -->
+        <!-- Clean Expense History (Read-Only) -->
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0;">Expense History</h3>
