@@ -2,12 +2,9 @@ package com.example.split;
 
 import jakarta.persistence.*;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -23,21 +20,13 @@ public class ExpenseApplication {
     }
 }
 
-// --- ENUMS ---
-enum SettlementStatus {
-    PENDING_APPROVAL, CONFIRMED, REJECTED
-}
-
 // --- ENTITIES ---
-@Entity 
-@Table(name = "users")
+@Entity @Table(name = "users")
 class User {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
-    @Column(unique = true) 
-    private String email;
+    @Column(unique = true) private String email;
     private String password;
 
     public Long getId() { return id; }
@@ -49,11 +38,9 @@ class User {
     public void setPassword(String password) { this.password = password; }
 }
 
-@Entity 
-@Table(name = "expense_groups")
+@Entity @Table(name = "expense_groups")
 class Group {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
     private Long userId;
@@ -77,23 +64,18 @@ class Group {
 
 @Entity
 class Member {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
-    private String email;
 
     public Long getId() { return id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
 }
 
 @Entity
 class Expense {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String description;
     private BigDecimal amount;
@@ -118,8 +100,7 @@ class Expense {
 
 @Entity
 class ExpenseShare {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long owerMemberId;
     private BigDecimal shareAmount;
@@ -134,32 +115,6 @@ class ExpenseShare {
     public void setPaid(Boolean paid) { this.paid = paid; }
 }
 
-@Entity
-class SettlementRequest {
-    @Id 
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private Long groupId;
-    private Long fromMemberId;
-    private Long toMemberId;
-    private BigDecimal amount;
-
-    @Enumerated(EnumType.STRING)
-    private SettlementStatus status = SettlementStatus.PENDING_APPROVAL;
-
-    public Long getId() { return id; }
-    public Long getGroupId() { return groupId; }
-    public void setGroupId(Long groupId) { this.groupId = groupId; }
-    public Long getFromMemberId() { return fromMemberId; }
-    public void setFromMemberId(Long fromMemberId) { this.fromMemberId = fromMemberId; }
-    public Long getToMemberId() { return toMemberId; }
-    public void setToMemberId(Long toMemberId) { this.toMemberId = toMemberId; }
-    public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public SettlementStatus getStatus() { return status; }
-    public void setStatus(SettlementStatus status) { this.status = status; }
-}
-
 // --- REPOSITORIES ---
 interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
@@ -169,12 +124,8 @@ interface GroupRepository extends JpaRepository<Group, Long> {
 }
 interface ExpenseRepository extends JpaRepository<Expense, Long> {}
 interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long> {}
-interface MemberRepository extends JpaRepository<Member, Long> {}
-interface SettlementRequestRepository extends JpaRepository<SettlementRequest, Long> {
-    List<SettlementRequest> findByGroupIdAndStatus(Long groupId, SettlementStatus status);
-}
 
-// --- CONTROLLER ---
+// --- MVC CONTROLLER ---
 @Controller
 class WebController {
 
@@ -182,21 +133,13 @@ class WebController {
     private final GroupRepository groupRepo;
     private final ExpenseRepository expenseRepo;
     private final ExpenseShareRepository shareRepo;
-    private final MemberRepository memberRepo;
-    private final SettlementRequestRepository settlementRepo;
-
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
 
     public WebController(UserRepository userRepo, GroupRepository groupRepo, 
-                         ExpenseRepository expenseRepo, ExpenseShareRepository shareRepo,
-                         MemberRepository memberRepo, SettlementRequestRepository settlementRepo) {
+                         ExpenseRepository expenseRepo, ExpenseShareRepository shareRepo) {
         this.userRepo = userRepo;
         this.groupRepo = groupRepo;
         this.expenseRepo = expenseRepo;
         this.shareRepo = shareRepo;
-        this.memberRepo = memberRepo;
-        this.settlementRepo = settlementRepo;
     }
 
     @GetMapping("/")
@@ -226,7 +169,7 @@ class WebController {
                 totalSpentMap.put(m.getId(), 0.0);
             }
 
-            // Pairwise Debt Matrix: pairwiseDebts[owerId][payerId]
+            // Matrix: pairwiseDebts[owerId][payerId] = total unpaid debt from ower to payer
             Map<Long, Map<Long, Double>> pairwiseDebts = new HashMap<>();
             for (Member m1 : currentGroup.getMembers()) {
                 pairwiseDebts.put(m1.getId(), new HashMap<>());
@@ -254,18 +197,30 @@ class WebController {
             }
 
             List<Member> memberList = currentGroup.getMembers();
+            Map<Long, Double> totalOwedByMember = new HashMap<>();
+            Map<Long, Double> totalToReceiveByMember = new HashMap<>();
+
+            for (Member m : memberList) {
+                totalOwedByMember.put(m.getId(), 0.0);
+                totalToReceiveByMember.put(m.getId(), 0.0);
+            }
+
             List<Map<String, Object>> settlementList = new ArrayList<>();
 
+            // Calculate pair-by-pair net offsets
             for (int i = 0; i < memberList.size(); i++) {
                 for (int j = i + 1; j < memberList.size(); j++) {
                     Long id1 = memberList.get(i).getId();
                     Long id2 = memberList.get(j).getId();
 
-                    double debt1To2 = pairwiseDebts.get(id1).get(id2);
-                    double debt2To1 = pairwiseDebts.get(id2).get(id1);
+                    double debt1To2 = pairwiseDebts.get(id1).get(id2); // 1 owes 2
+                    double debt2To1 = pairwiseDebts.get(id2).get(id1); // 2 owes 1
 
                     if (debt1To2 > debt2To1) {
                         double net = debt1To2 - debt2To1;
+                        totalOwedByMember.put(id1, totalOwedByMember.get(id1) + net);
+                        totalToReceiveByMember.put(id2, totalToReceiveByMember.get(id2) + net);
+
                         Map<String, Object> stmt = new HashMap<>();
                         stmt.put("fromId", id1);
                         stmt.put("fromName", memberNameMap.get(id1));
@@ -275,6 +230,9 @@ class WebController {
                         settlementList.add(stmt);
                     } else if (debt2To1 > debt1To2) {
                         double net = debt2To1 - debt1To2;
+                        totalOwedByMember.put(id2, totalOwedByMember.get(id2) + net);
+                        totalToReceiveByMember.put(id1, totalToReceiveByMember.get(id1) + net);
+
                         Map<String, Object> stmt = new HashMap<>();
                         stmt.put("fromId", id2);
                         stmt.put("fromName", memberNameMap.get(id2));
@@ -289,20 +247,21 @@ class WebController {
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
                 double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
+                double owed = totalOwedByMember.getOrDefault(m.getId(), 0.0);
+                double toReceive = totalToReceiveByMember.getOrDefault(m.getId(), 0.0);
+                double balance = toReceive - owed;
 
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
-                stat.put("email", m.getEmail());
                 stat.put("paid", totalSpent);
+                stat.put("owed", owed);
+                stat.put("toReceive", toReceive);
+                stat.put("balance", balance);
                 memberStats.add(stat);
             }
-
-            List<SettlementRequest> pendingRequests = settlementRepo.findByGroupIdAndStatus(currentGroup.getId(), SettlementStatus.PENDING_APPROVAL);
-
             model.addAttribute("memberStats", memberStats);
             model.addAttribute("settlements", settlementList);
-            model.addAttribute("pendingRequests", pendingRequests);
         }
 
         return "dashboard";
@@ -354,11 +313,10 @@ class WebController {
     }
 
     @PostMapping("/members/add")
-    public String addMember(@RequestParam Long groupId, @RequestParam String name, @RequestParam String email) {
+    public String addMember(@RequestParam Long groupId, @RequestParam String name) {
         Group g = groupRepo.findById(groupId).orElseThrow();
         Member m = new Member();
         m.setName(name);
-        m.setEmail(email);
         g.getMembers().add(m);
         groupRepo.save(g);
         return "redirect:/?groupId=" + groupId;
@@ -407,67 +365,28 @@ class WebController {
         return "redirect:/?groupId=" + groupId;
     }
 
-    @PostMapping("/settle/request")
-    public String requestSettlement(@RequestParam Long groupId, @RequestParam Long fromMemberId, 
-                                    @RequestParam Long toMemberId, @RequestParam BigDecimal amount) {
-        SettlementRequest req = new SettlementRequest();
-        req.setGroupId(groupId);
-        req.setFromMemberId(fromMemberId);
-        req.setToMemberId(toMemberId);
-        req.setAmount(amount);
-        req.setStatus(SettlementStatus.PENDING_APPROVAL);
-        settlementRepo.save(req);
+    @PostMapping("/settle")
+    public String settleDebt(@RequestParam Long groupId, @RequestParam Long fromMemberId, 
+                             @RequestParam Long toMemberId, @RequestParam BigDecimal amount) {
+        Group g = groupRepo.findById(groupId).orElse(null);
+        if (g != null) {
+            // Record settlement as a balancing expense item paid by debtor to creditor
+            Expense settlement = new Expense();
+            settlement.setDescription("Settlement Payment");
+            settlement.setAmount(amount);
+            settlement.setPaidByMemberId(fromMemberId);
+            settlement.setDate(java.time.LocalDate.now().toString());
 
-        Member recipient = memberRepo.findById(toMemberId).orElse(null);
-        Member sender = memberRepo.findById(fromMemberId).orElse(null);
+            ExpenseShare share = new ExpenseShare();
+            share.setOwerMemberId(toMemberId);
+            share.setShareAmount(amount);
+            share.setPaid(false);
+            settlement.getShares().add(share);
 
-        if (mailSender != null && recipient != null && recipient.getEmail() != null && sender != null) {
-            try {
-                SimpleMailMessage mail = new SimpleMailMessage();
-                mail.setTo(recipient.getEmail());
-                mail.setSubject("Payment Settlement Confirmation Required");
-                mail.setText("Hello " + recipient.getName() + ",\n\n" +
-                             sender.getName() + " has marked a payment of ₹" + amount + " as paid to you.\n" +
-                             "Please log into SplitStay to confirm or reject this settlement.\n\n" +
-                             "Thank you!");
-                mailSender.send(mail);
-            } catch (Exception ex) {
-                System.err.println("Email notification failed: " + ex.getMessage());
-            }
+            g.getExpenses().add(settlement);
+            groupRepo.save(g);
         }
-
         return "redirect:/?groupId=" + groupId;
-    }
-
-    @PostMapping("/settle/approve")
-    public String approveSettlement(@RequestParam Long requestId, @RequestParam boolean approved) {
-        SettlementRequest req = settlementRepo.findById(requestId).orElse(null);
-        if (req != null) {
-            if (approved) {
-                req.setStatus(SettlementStatus.CONFIRMED);
-                settlementRepo.save(req);
-
-                Group g = groupRepo.findById(req.getGroupId()).orElseThrow();
-                Expense settlement = new Expense();
-                settlement.setDescription("Settlement Payment (Approved)");
-                settlement.setAmount(req.getAmount());
-                settlement.setPaidByMemberId(req.getFromMemberId());
-                settlement.setDate(java.time.LocalDate.now().toString());
-
-                ExpenseShare share = new ExpenseShare();
-                share.setOwerMemberId(req.getToMemberId());
-                share.setShareAmount(req.getAmount());
-                share.setPaid(false);
-                settlement.getShares().add(share);
-
-                g.getExpenses().add(settlement);
-                groupRepo.save(g);
-            } else {
-                req.setStatus(SettlementStatus.REJECTED);
-                settlementRepo.save(req);
-            }
-        }
-        return "redirect:/?groupId=" + (req != null ? req.getGroupId() : "");
     }
 
     @PostMapping("/expenses/clear")
