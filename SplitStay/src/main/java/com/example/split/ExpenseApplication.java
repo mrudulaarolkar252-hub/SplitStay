@@ -169,7 +169,7 @@ class WebController {
                 totalSpentMap.put(m.getId(), 0.0);
             }
 
-            // 1. Build Pairwise Direct Debt Matrix: pairwiseDebts[owerId][creditorId]
+            // Matrix: pairwiseDebts[owerId][payerId] = total unpaid debt from ower to payer
             Map<Long, Map<Long, Double>> pairwiseDebts = new HashMap<>();
             for (Member m1 : currentGroup.getMembers()) {
                 pairwiseDebts.put(m1.getId(), new HashMap<>());
@@ -185,27 +185,29 @@ class WebController {
                 }
 
                 for (ExpenseShare share : e.getShares()) {
-                    if (!share.isPaid() && payerId != null) {
+                    Long owerId = share.getOwerMemberId();
+                    if (!share.isPaid() && payerId != null && !owerId.equals(payerId)) {
                         double shareAmt = share.getShareAmount() != null ? share.getShareAmount().doubleValue() : 0.0;
-                        Long owerId = share.getOwerMemberId();
-                        
                         if (pairwiseDebts.containsKey(owerId) && pairwiseDebts.get(owerId).containsKey(payerId)) {
-                            double currentDebt = pairwiseDebts.get(owerId).get(payerId);
-                            pairwiseDebts.get(owerId).put(payerId, currentDebt + shareAmt);
+                            double cur = pairwiseDebts.get(owerId).get(payerId);
+                            pairwiseDebts.get(owerId).put(payerId, cur + shareAmt);
                         }
                     }
                 }
             }
 
-            // 2. Net mutual debts directly between pairs (e.g. A <-> B)
             List<Member> memberList = currentGroup.getMembers();
-            Map<Long, Double> finalNetBalanceMap = new HashMap<>();
+            Map<Long, Double> totalOwedByMember = new HashMap<>();
+            Map<Long, Double> totalToReceiveByMember = new HashMap<>();
+
             for (Member m : memberList) {
-                finalNetBalanceMap.put(m.getId(), 0.0);
+                totalOwedByMember.put(m.getId(), 0.0);
+                totalToReceiveByMember.put(m.getId(), 0.0);
             }
 
-            List<String> settlementStatements = new ArrayList<>();
+            List<Map<String, Object>> settlementList = new ArrayList<>();
 
+            // Calculate pair-by-pair net offsets
             for (int i = 0; i < memberList.size(); i++) {
                 for (int j = i + 1; j < memberList.size(); j++) {
                     Long id1 = memberList.get(i).getId();
@@ -216,14 +218,28 @@ class WebController {
 
                     if (debt1To2 > debt2To1) {
                         double net = debt1To2 - debt2To1;
-                        finalNetBalanceMap.put(id1, finalNetBalanceMap.get(id1) - net);
-                        finalNetBalanceMap.put(id2, finalNetBalanceMap.get(id2) + net);
-                        settlementStatements.add(memberNameMap.get(id1) + " owes " + memberNameMap.get(id2) + " ₹" + String.format("%.2f", net));
+                        totalOwedByMember.put(id1, totalOwedByMember.get(id1) + net);
+                        totalToReceiveByMember.put(id2, totalToReceiveByMember.get(id2) + net);
+
+                        Map<String, Object> stmt = new HashMap<>();
+                        stmt.put("fromId", id1);
+                        stmt.put("fromName", memberNameMap.get(id1));
+                        stmt.put("toId", id2);
+                        stmt.put("toName", memberNameMap.get(id2));
+                        stmt.put("amount", net);
+                        settlementList.add(stmt);
                     } else if (debt2To1 > debt1To2) {
                         double net = debt2To1 - debt1To2;
-                        finalNetBalanceMap.put(id2, finalNetBalanceMap.get(id2) - net);
-                        finalNetBalanceMap.put(id1, finalNetBalanceMap.get(id1) + net);
-                        settlementStatements.add(memberNameMap.get(id2) + " owes " + memberNameMap.get(id1) + " ₹" + String.format("%.2f", net));
+                        totalOwedByMember.put(id2, totalOwedByMember.get(id2) + net);
+                        totalToReceiveByMember.put(id1, totalToReceiveByMember.get(id1) + net);
+
+                        Map<String, Object> stmt = new HashMap<>();
+                        stmt.put("fromId", id2);
+                        stmt.put("fromName", memberNameMap.get(id2));
+                        stmt.put("toId", id1);
+                        stmt.put("toName", memberNameMap.get(id1));
+                        stmt.put("amount", net);
+                        settlementList.add(stmt);
                     }
                 }
             }
@@ -231,17 +247,21 @@ class WebController {
             List<Map<String, Object>> memberStats = new ArrayList<>();
             for (Member m : currentGroup.getMembers()) {
                 double totalSpent = totalSpentMap.getOrDefault(m.getId(), 0.0);
-                double balance = finalNetBalanceMap.getOrDefault(m.getId(), 0.0);
-                
+                double owed = totalOwedByMember.getOrDefault(m.getId(), 0.0);
+                double toReceive = totalToReceiveByMember.getOrDefault(m.getId(), 0.0);
+                double balance = toReceive - owed;
+
                 Map<String, Object> stat = new HashMap<>();
                 stat.put("id", m.getId());
                 stat.put("name", m.getName());
                 stat.put("paid", totalSpent);
+                stat.put("owed", owed);
+                stat.put("toReceive", toReceive);
                 stat.put("balance", balance);
                 memberStats.add(stat);
             }
             model.addAttribute("memberStats", memberStats);
-            model.addAttribute("settlements", settlementStatements);
+            model.addAttribute("settlements", settlementList);
         }
 
         return "dashboard";
@@ -345,12 +365,26 @@ class WebController {
         return "redirect:/?groupId=" + groupId;
     }
 
-    @PostMapping("/shares/toggle-paid")
-    public String toggleSharePaid(@RequestParam Long shareId, @RequestParam Long groupId) {
-        ExpenseShare share = shareRepo.findById(shareId).orElse(null);
-        if (share != null) {
-            share.setPaid(!share.isPaid());
-            shareRepo.save(share);
+    @PostMapping("/settle")
+    public String settleDebt(@RequestParam Long groupId, @RequestParam Long fromMemberId, 
+                             @RequestParam Long toMemberId, @RequestParam BigDecimal amount) {
+        Group g = groupRepo.findById(groupId).orElse(null);
+        if (g != null) {
+            // Record settlement as a balancing expense item paid by debtor to creditor
+            Expense settlement = new Expense();
+            settlement.setDescription("Settlement Payment");
+            settlement.setAmount(amount);
+            settlement.setPaidByMemberId(fromMemberId);
+            settlement.setDate(java.time.LocalDate.now().toString());
+
+            ExpenseShare share = new ExpenseShare();
+            share.setOwerMemberId(toMemberId);
+            share.setShareAmount(amount);
+            share.setPaid(false);
+            settlement.getShares().add(share);
+
+            g.getExpenses().add(settlement);
+            groupRepo.save(g);
         }
         return "redirect:/?groupId=" + groupId;
     }
