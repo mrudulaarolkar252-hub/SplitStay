@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>SplitStay</title>
+    <title>Expense Splitter Dashboard</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -42,7 +42,7 @@
             gap: 10px;
             align-items: center;
         }
-        select, input[type="text"], input[type="number"], input[type="date"] {
+        select, input[type="text"], input[type="email"], input[type="number"], input[type="date"] {
             padding: 8px 12px;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -58,10 +58,9 @@
             font-size: 14px;
         }
         .btn:hover { background-color: #2980b9; }
-        .btn-danger {
-            background-color: #e74c3c;
-        }
-        .btn-danger:hover { background-color: #c0392b; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-danger { background-color: #e74c3c; }
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -96,11 +95,23 @@
             cursor: pointer;
             font-size: 13px;
             font-weight: bold;
-            padding: 4px 8px;
         }
-        .btn-remove:hover {
-            text-decoration: underline;
+        .btn-remove:hover { text-decoration: underline; }
+        .settlement-box {
+            background: #e8f8f5;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 6px;
         }
+        .settlement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px dashed #a3e4d7;
+        }
+        .settlement-item:last-child { border-bottom: none; }
         .expense-item {
             border: 1px solid #eee;
             border-radius: 6px;
@@ -114,31 +125,21 @@
             font-weight: bold;
             margin-bottom: 8px;
         }
-        .share-list {
-            margin-top: 8px;
-            padding-left: 15px;
-            font-size: 13px;
-        }
-        .share-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
+        .share-list { margin-top: 8px; padding-left: 15px; font-size: 13px; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>SplitStay</h1>
+        <h1>Expense Splitter</h1>
         <div>
             <span>Welcome, <b th:text="${user.name}">User</b>!</span>
             <a href="/logout" class="logout-btn" style="margin-left: 15px;">Logout</a>
         </div>
     </div>
 
-    <!-- Create & Select Groups -->
+    <!-- Select / Create Group -->
     <div class="group-selector">
         <form th:action="@{/}" method="get">
             <label for="groupSelect"><b>Select Group:</b></label>
@@ -158,14 +159,60 @@
     </div>
 
     <div th:if="${currentGroup != null}">
+        
+        <!-- Pending Settlement Confirmations Banner -->
+        <div class="card" th:if="${not #lists.isEmpty(pendingRequests)}" style="border-left: 4px solid #f39c12; margin-bottom: 20px; background-color: #fef9e7;">
+            <h3 style="color: #d35400; margin-top: 0;">Pending Settlement Confirmations</h3>
+            <div th:each="req : ${pendingRequests}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #f5b041;">
+                <span>
+                    <b th:text="${memberNameMap.get(req.fromMemberId)}">Member</b> marked payment of 
+                    <b style="color: #27ae60;" th:text="'₹' + ${#numbers.formatDecimal(req.amount, 1, 2)}">₹0.00</b> to 
+                    <b th:text="${memberNameMap.get(req.toMemberId)}">Recipient</b>.
+                </span>
+                <div style="display: flex; gap: 5px;">
+                    <form th:action="@{/settle/approve}" method="post">
+                        <input type="hidden" name="requestId" th:value="${req.id}" />
+                        <input type="hidden" name="approved" value="true" />
+                        <button type="submit" class="btn btn-success" style="padding: 4px 8px; font-size: 12px;">Confirm ✓</button>
+                    </form>
+                    <form th:action="@{/settle/approve}" method="post">
+                        <input type="hidden" name="requestId" th:value="${req.id}" />
+                        <input type="hidden" name="approved" value="false" />
+                        <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Reject ✖</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Direct Pairwise Settlement Plan -->
+        <div class="settlement-box" th:if="${not #lists.isEmpty(settlements)}">
+            <h3 style="margin: 0 0 10px 0; color: #2e7d32;">Pairwise Settlement Plan:</h3>
+            <div th:each="s : ${settlements}" class="settlement-item">
+                <span>
+                    <b th:text="${s.fromName}">Debtor</b> owes <b th:text="${s.toName}">Creditor</b>: 
+                    <span style="color: #27ae60;" th:text="'₹' + ${#numbers.formatDecimal(s.amount, 1, 2)}">₹0.00</span>
+                </span>
+                <form th:action="@{/settle/request}" method="post" style="margin: 0;">
+                    <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
+                    <input type="hidden" name="fromMemberId" th:value="${s.fromId}" />
+                    <input type="hidden" name="toMemberId" th:value="${s.toId}" />
+                    <input type="hidden" name="amount" th:value="${s.amount}" />
+                    <button type="submit" class="btn btn-success" style="padding: 4px 10px; font-size: 12px;">
+                        Mark Paid (Request Approval)
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div class="grid">
             <!-- Add Member Form -->
             <div class="card">
                 <h3>Add Member</h3>
-                <form th:action="@{/members/add}" method="post" style="display: flex; gap: 8px;">
+                <form th:action="@{/members/add}" method="post" style="display: flex; flex-direction: column; gap: 8px;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
-                    <input type="text" name="name" placeholder="Member Name" required style="flex: 1;" />
-                    <button type="submit" class="btn">Add</button>
+                    <input type="text" name="name" placeholder="Member Name" required />
+                    <input type="email" name="email" placeholder="Member Email" required />
+                    <button type="submit" class="btn">Add Member</button>
                 </form>
             </div>
 
@@ -181,7 +228,7 @@
                         <option th:each="m : ${currentGroup.members}" th:value="${m.id}" th:text="${m.name}"></option>
                     </select>
                     <input type="date" name="date" required />
-                    <button type="submit" class="btn" style="background-color: #2ecc71;">Add Expense</button>
+                    <button type="submit" class="btn btn-success">Add Expense</button>
                 </form>
             </div>
         </div>
@@ -193,7 +240,8 @@
                 <thead>
                     <tr>
                         <th>Member Name</th>
-                        <th>Total Paid</th>
+                        <th>Email</th>
+                        <th>Total Paid Out-of-Pocket</th>
                         <th>Net Status</th>
                         <th>Action</th>
                     </tr>
@@ -201,6 +249,7 @@
                 <tbody>
                     <tr th:each="stat : ${memberStats}">
                         <td th:text="${stat.name}">Name</td>
+                        <td th:text="${stat.email}" style="color: #7f8c8d; font-size: 13px;">email@domain.com</td>
                         <td th:text="'₹' + ${#numbers.formatDecimal(stat.paid, 1, 2)}">₹0.00</td>
                         <td>
                             <span th:if="${stat.balance > 0}" class="badge-positive" th:text="'Gets back ₹' + ${#numbers.formatDecimal(stat.balance, 1, 2)}"></span>
@@ -208,7 +257,6 @@
                             <span th:if="${stat.balance == 0}" class="badge-neutral">Settled up</span>
                         </td>
                         <td>
-                            <!-- Remove Member Button -->
                             <form th:action="@{/members/delete}" method="post" style="margin: 0;">
                                 <input type="hidden" name="memberId" th:value="${stat.id}" />
                                 <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
@@ -218,14 +266,11 @@
                             </form>
                         </td>
                     </tr>
-                    <tr th:if="${#lists.isEmpty(memberStats)}">
-                        <td colspan="4" style="text-align: center; color: #888;">No members added yet.</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Expense History Section -->
+        <!-- Clean Expense History Section -->
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0;">Expense History</h3>
@@ -250,20 +295,9 @@
                 </div>
 
                 <div class="share-list">
-                    <div th:each="share : ${expense.shares}" class="share-item">
-                        <span>
-                            <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span> owes 
-                            <b th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}">₹0.00</b>
-                        </span>
-                        <form th:action="@{/shares/toggle-paid}" method="post" style="margin: 0;">
-                            <input type="hidden" name="shareId" th:value="${share.id}" />
-                            <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
-                            <button type="submit" 
-                                    th:style="${share.paid} ? 'background-color: #2ecc71;' : 'background-color: #e67e22;'" 
-                                    class="btn" style="padding: 3px 8px; font-size: 12px;">
-                                <span th:text="${share.paid} ? 'Paid ✓' : 'Mark Paid'"></span>
-                            </button>
-                        </form>
+                    <div th:each="share : ${expense.shares}">
+                        • <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span> share: 
+                        <b th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}">₹0.00</b>
                     </div>
                 </div>
             </div>
