@@ -2,29 +2,29 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>SplitStay — Expense Dashboard</title>
+    <title>SplitStay</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
         :root {
-            --bg: #0b1329;
-            --card-bg: rgba(16, 26, 51, 0.75);
-            --card-border: rgba(96, 165, 250, 0.12);
-            --text-primary: #f0f6ff;
-            --text-muted: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-blue-hover: #2563eb;
-            --accent-cyan: #38bdf8;
-            --success: #34d399;
-            --success-bg: rgba(52, 211, 153, 0.08);
-            --danger: #f87171;
+            --bg: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --card-border: rgba(203, 213, 225, 0.6);
+            --text-primary: #0f172a;
+            --text-muted: #64748b;
+            --accent-blue: #2563eb;
+            --accent-blue-hover: #1d4ed8;
+            --accent-cyan: #0284c7;
+            --success: #16a34a;
+            --success-bg: rgba(240, 253, 244, 0.8);
+            --danger: #dc2626;
             --radius: 14px;
         }
 
         body {
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             background-color: var(--bg);
-            background-image: radial-gradient(circle at 50% 0%, #172554 0%, #0b1329 80%);
+            background-image: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f1f5f9 80%);
             color: var(--text-primary);
             margin: 0;
             padding: 48px 20px;
@@ -51,34 +51,35 @@
             font-family: 'Playfair Display', serif;
             margin: 0;
             font-size: 28px;
-            font-weight: 400;
+            font-weight: 600;
             letter-spacing: -0.01em;
-            color: #ffffff;
+            color: var(--text-primary);
         }
 
         .user-pill {
             display: flex;
             align-items: center;
             gap: 14px;
-            background: rgba(30, 58, 138, 0.25);
+            background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(12px);
             padding: 8px 18px;
             border-radius: 30px;
             border: 1px solid var(--card-border);
             font-size: 13px;
             color: var(--text-muted);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
         }
 
         .user-pill b {
-            color: #ffffff;
-            font-weight: 500;
+            color: var(--text-primary);
+            font-weight: 600;
         }
 
         .logout-btn {
             color: var(--danger);
             text-decoration: none;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
             transition: opacity 0.15s ease;
         }
 
@@ -99,7 +100,7 @@
             border: 1px solid var(--card-border);
             border-radius: var(--radius);
             font-size: 13.5px;
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             color: var(--text-primary);
             outline: none;
             transition: all 0.2s ease;
@@ -107,8 +108,9 @@
         }
 
         select:focus, input:focus {
-            border-color: rgba(56, 189, 248, 0.4);
-            background: rgba(15, 23, 42, 0.95);
+            border-color: var(--accent-blue);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
         .btn {
@@ -122,7 +124,7 @@
             font-weight: 600;
             letter-spacing: 0.01em;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
         }
 
         .btn:hover {
@@ -131,20 +133,21 @@
         }
 
         .btn-subtle {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--accent-cyan);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-            box-shadow: none;
+            background: rgba(255, 255, 255, 0.8);
+            color: var(--accent-blue);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         }
 
         .btn-subtle:hover {
-            background: rgba(59, 130, 246, 0.2);
+            background: #ffffff;
+            border-color: var(--accent-blue);
         }
 
-        /* PRO BANNER - BLUE GLASS */
+        /* PRO BANNER - LIGHT GLASS */
         .premium-card {
-            background: linear-gradient(135deg, rgba(30, 58, 138, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
-            border: 1px solid rgba(56, 189, 248, 0.3);
+            background: linear-gradient(135deg, rgba(238, 242, 255, 0.9) 0%, rgba(224, 242, 254, 0.9) 100%);
+            border: 1px solid rgba(186, 230, 253, 0.8);
             backdrop-filter: blur(16px);
             border-radius: var(--radius);
             padding: 24px 28px;
@@ -152,16 +155,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.3);
+            box-shadow: 0 8px 20px -4px rgba(186, 230, 253, 0.4);
         }
 
         .premium-info h3 {
             font-family: 'Playfair Display', serif;
             margin: 0 0 4px 0;
             font-size: 18px;
-            font-weight: 400;
+            font-weight: 600;
             color: var(--accent-cyan);
-            letter-spacing: 0.02em;
+            letter-spacing: 0.01em;
         }
 
         .premium-info p {
@@ -172,20 +175,22 @@
         }
 
         .btn-pro {
-            background: rgba(56, 189, 248, 0.15);
+            background: #ffffff;
             color: var(--accent-cyan);
-            border: 1px solid rgba(56, 189, 248, 0.4);
+            border: 1px solid rgba(2, 132, 199, 0.3);
             padding: 10px 22px;
             border-radius: 30px;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 13px;
             cursor: pointer;
             transition: all 0.2s ease;
             white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
         .btn-pro:hover {
-            background: rgba(56, 189, 248, 0.25);
+            background: var(--accent-cyan);
+            color: #ffffff;
             border-color: var(--accent-cyan);
         }
 
@@ -203,14 +208,15 @@
             border-radius: var(--radius);
             padding: 24px;
             margin-bottom: 28px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
         }
 
         .card h3 {
             font-family: 'Playfair Display', serif;
             margin: 0 0 18px 0;
             font-size: 18px;
-            font-weight: 400;
-            color: #ffffff;
+            font-weight: 600;
+            color: var(--text-primary);
             letter-spacing: -0.01em;
         }
 
@@ -229,7 +235,7 @@
 
         th {
             color: var(--text-muted);
-            font-weight: 500;
+            font-weight: 600;
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -256,7 +262,7 @@
         /* SETTLEMENTS */
         .settlement-box {
             background: var(--success-bg);
-            border: 1px solid rgba(52, 211, 153, 0.2);
+            border: 1px solid rgba(187, 247, 208, 0.8);
             border-radius: var(--radius);
             padding: 8px 18px;
         }
@@ -266,7 +272,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 12px 0;
-            border-bottom: 1px dashed rgba(52, 211, 153, 0.15);
+            border-bottom: 1px dashed rgba(187, 247, 208, 0.8);
             font-size: 13.5px;
         }
 
@@ -288,7 +294,7 @@
             display: flex;
             justify-content: space-between;
             font-size: 14.5px;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 6px;
         }
 
@@ -298,12 +304,12 @@
             color: var(--text-muted);
         }
 
-        /* ELEGANT BLUE MODAL */
+        /* ELEGANT LIGHT MODAL */
         .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(11, 19, 41, 0.8);
+            background: rgba(15, 23, 42, 0.3);
             backdrop-filter: blur(8px);
             z-index: 1000;
             justify-content: center;
@@ -311,20 +317,20 @@
         }
 
         .modal-content {
-            background: #0f172a;
-            border: 1px solid rgba(56, 189, 248, 0.2);
+            background: #ffffff;
+            border: 1px solid var(--card-border);
             padding: 36px;
             border-radius: var(--radius);
             text-align: center;
             max-width: 380px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
         }
 
         .modal-content h2 {
             font-family: 'Playfair Display', serif;
             margin: 0 0 10px 0;
             font-size: 22px;
-            font-weight: 400;
+            font-weight: 600;
             color: var(--accent-cyan);
         }
 
@@ -452,13 +458,13 @@
                         <input type="hidden" name="fromMemberId" th:value="${s.fromId}" />
                         <input type="hidden" name="toMemberId" th:value="${s.toId}" />
                         <input type="hidden" name="amount" th:value="${s.amount}" />
-                        <button type="submit" class="btn btn-subtle" style="padding: 6px 14px; font-size: 12px; border-color: rgba(52, 211, 153, 0.3); color: var(--success);">
+                        <button type="submit" class="btn btn-subtle" style="padding: 6px 14px; font-size: 12px; border-color: rgba(34, 197, 94, 0.4); color: var(--success); background: #ffffff;">
                             Settle ✓
                         </button>
                     </form>
                 </div>
             </div>
-            <div th:if="${#lists.isEmpty(settlements)}" style="text-align: center; color: var(--success); font-weight: 500; font-size: 13.5px; padding: 8px 0;">
+            <div th:if="${#lists.isEmpty(settlements)}" style="text-align: center; color: var(--success); font-weight: 600; font-size: 13.5px; padding: 8px 0;">
                 All debts are settled up.
             </div>
         </div>
@@ -484,42 +490,4 @@
                     <div style="font-weight: 600;" th:text="'₹' + ${#numbers.formatDecimal(expense.amount, 1, 2)}">₹0.00</div>
                 </div>
                 <div style="font-size: 12.5px; color: var(--text-muted);">
-                    Paid by <b style="color: var(--text-primary);" th:text="${memberNameMap.get(expense.paidByMemberId)}">Payer</b>
-                </div>
-
-                <div class="share-list">
-                    <span th:each="share, iterStat : ${expense.shares}">
-                        • <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span> share: 
-                        <b style="color: var(--text-primary);" th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}"></b>
-                    </span>
-                </div>
-            </div>
-
-            <div th:if="${#lists.isEmpty(currentGroup.expenses)}" style="text-align: center; color: var(--text-muted); font-size: 13.5px; padding: 12px 0;">
-                No expenses logged yet.
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- MODAL -->
-<div id="comingSoonModal" class="modal-overlay">
-    <div class="modal-content">
-        <h2>SplitStay Pro</h2>
-        <p>Email double-confirmation verifications, direct UPI QR code generations, and PDF export reporting will arrive in the upcoming update.</p>
-        <button class="btn" style="width: 100%; padding: 11px;" onclick="hideComingSoonModal()">Understood</button>
-    </div>
-</div>
-
-<script>
-    function showComingSoonModal() {
-        document.getElementById('comingSoonModal').style.display = 'flex';
-    }
-    function hideComingSoonModal() {
-        document.getElementById('comingSoonModal').style.display = 'none';
-    }
-</script>
-
-</body>
-</html>
+                    Paid by <b style="
