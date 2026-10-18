@@ -63,7 +63,58 @@
         .btn-success:hover { background-color: #27ae60; }
         .btn-danger { background-color: #e74c3c; }
 
-        /* --- FLOATING ACTION BUTTON (FAB) INLINE STYLING --- */
+        /* --- PREMIUM CARD STYLING --- */
+        .premium-card {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 6px 18px rgba(37, 117, 252, 0.25);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .premium-info h3 { margin: 0 0 8px 0; font-size: 20px; color: #fff; }
+        .premium-info ul { margin: 8px 0 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.6; }
+        .btn-premium {
+            background-color: #f1c40f;
+            color: #2c3e50;
+            font-weight: bold;
+            font-size: 15px;
+            padding: 12px 24px;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease, background 0.2s ease;
+            white-space: nowrap;
+        }
+        .btn-premium:hover {
+            transform: scale(1.05);
+            background-color: #f39c12;
+        }
+
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .modal-content h2 { margin-top: 0; color: #2c3e50; }
+
         .btn-floating {
             position: sticky;
             top: 20px;
@@ -89,53 +140,16 @@
             margin-bottom: 25px;
         }
         .card h3 { margin-top: 0; color: #34495e; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            text-align: left;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; }
-        .btn-remove {
-            color: #e74c3c;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
-        }
+        .btn-remove { color: #e74c3c; background: none; border: none; cursor: pointer; font-size: 13px; font-weight: bold; }
         .btn-remove:hover { text-decoration: underline; }
-        .settlement-box {
-            background: #e8f8f5;
-            border-left: 4px solid #2ecc71;
-            padding: 15px;
-            border-radius: 6px;
-        }
-        .settlement-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px dashed #a3e4d7;
-        }
+        .settlement-box { background: #e8f8f5; border-left: 4px solid #2ecc71; padding: 15px; border-radius: 6px; }
+        .settlement-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #a3e4d7; }
         .settlement-item:last-child { border-bottom: none; }
-        .expense-item {
-            border: 1px solid #eee;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 12px;
-            background: #fff;
-        }
-        .expense-header {
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
+        .expense-item { border: 1px solid #eee; border-radius: 6px; padding: 12px; margin-bottom: 12px; background: #fff; }
+        .expense-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; }
         .share-list { margin-top: 8px; padding-left: 15px; font-size: 13px; color: #666; }
     </style>
 </head>
@@ -165,12 +179,24 @@
 
         <form th:action="@{/groups/create}" method="post" style="display: flex; gap: 5px; margin-left: 20px;">
             <input type="text" name="name" placeholder="New Group Name" required />
-            <!-- Floating Create Group Button -->
             <button type="submit" class="btn btn-floating">+ Create Group</button>
         </form>
     </div>
 
     <div th:if="${currentGroup != null}">
+
+        <!-- PREMIUM PROMO BANNER -->
+        <div class="premium-card">
+            <div class="premium-info">
+                <h3>👑 SplitStay Premium</h3>
+                <ul>
+                    <li><b>Email Payment Verification:</b> Invite members by email to double-confirm payments when marked paid.</li>
+                    <li><b>Instant UPI Integration:</b> Generate direct Google Pay / PhonePe / Paytm QR codes for instant settlement.</li>
+                    <li><b>PDF & Excel Reports:</b> Export itemized trip summaries and monthly budget audits.</li>
+                </ul>
+            </div>
+            <button class="btn-premium" onclick="showComingSoonModal()">Buy Premium ⭐</button>
+        </div>
         
         <div class="grid">
             <!-- Add Member Form -->
@@ -179,7 +205,6 @@
                 <form th:action="@{/members/add}" method="post" style="display: flex; gap: 8px;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
                     <input type="text" name="name" placeholder="Member Name" required style="flex: 1;" />
-                    <!-- Floating Add Member Button -->
                     <button type="submit" class="btn btn-floating">Add</button>
                 </form>
             </div>
@@ -196,7 +221,6 @@
                         <option th:each="m : ${currentGroup.members}" th:value="${m.id}" th:text="${m.name}"></option>
                     </select>
                     <input type="date" name="date" required />
-                    <!-- Floating Add Expense Button -->
                     <button type="submit" class="btn btn-success btn-floating">Add Expense</button>
                 </form>
             </div>
@@ -259,7 +283,7 @@
             </div>
         </div>
 
-        <!-- Clean Expense History (Read-Only) -->
+        <!-- Expense History -->
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0;">Expense History</h3>
@@ -298,6 +322,26 @@
 
     </div>
 </div>
+
+<!-- COMING SOON MODAL -->
+<div id="comingSoonModal" class="modal-overlay">
+    <div class="modal-content">
+        <h2>🚀 Coming Soon!</h2>
+        <p style="color: #666; font-size: 14px; margin: 15px 0 25px 0;">
+            SplitStay Premium is currently in active development. Email confirmations, UPI payment links, and PDF reports will be available in the upcoming release!
+        </p>
+        <button class="btn btn-success" style="padding: 10px 25px;" onclick="hideComingSoonModal()">Got it!</button>
+    </div>
+</div>
+
+<script>
+    function showComingSoonModal() {
+        document.getElementById('comingSoonModal').style.display = 'flex';
+    }
+    function hideComingSoonModal() {
+        document.getElementById('comingSoonModal').style.display = 'none';
+    }
+</script>
 
 </body>
 </html>
