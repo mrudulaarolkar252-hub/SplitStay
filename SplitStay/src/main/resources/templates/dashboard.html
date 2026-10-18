@@ -2,28 +2,33 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>SplitStay — Dashboard</title>
+    <title>SplitStay — Expense Dashboard</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
         :root {
-            --bg: #fafafa;
-            --card-bg: #ffffff;
-            --text-primary: #171717;
-            --text-secondary: #737373;
-            --border: #e5e5e5;
-            --accent: #0a0a0a;
-            --accent-hover: #262626;
-            --success-bg: #f0fdf4;
-            --success-text: #166534;
-            --danger-text: #dc2626;
-            --radius: 8px;
+            --bg: #121417;
+            --card-bg: rgba(26, 29, 34, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent: #22262c;
+            --accent-hover: #2e343d;
+            --accent-gold: #d4af37;
+            --success: #34d399;
+            --success-bg: rgba(52, 211, 153, 0.1);
+            --danger: #f87171;
+            --radius: 14px;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
             background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% 0%, #1e232a 0%, #121417 75%);
             color: var(--text-primary);
             margin: 0;
-            padding: 40px 20px;
+            padding: 48px 20px;
+            min-height: 100vh;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -32,34 +37,56 @@
             margin: 0 auto;
         }
 
+        /* HEADER */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding-bottom: 24px;
             margin-bottom: 32px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--card-border);
         }
 
         .header h1 {
+            font-family: 'Playfair Display', serif;
             margin: 0;
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: -0.02em;
+            font-size: 28px;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            color: #ffffff;
         }
 
-        .user-nav {
-            font-size: 14px;
-            color: var(--text-secondary);
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+            padding: 8px 18px;
+            border-radius: 30px;
+            border: 1px solid var(--card-border);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .user-pill b {
+            color: #ffffff;
+            font-weight: 500;
         }
 
         .logout-btn {
-            color: var(--danger-text);
+            color: var(--danger);
             text-decoration: none;
-            margin-left: 12px;
             font-size: 13px;
+            font-weight: 500;
+            transition: opacity 0.15s ease;
         }
 
+        .logout-btn:hover {
+            opacity: 0.8;
+        }
+
+        /* GROUP SELECTOR */
         .group-selector {
             margin-bottom: 28px;
             display: flex;
@@ -68,52 +95,57 @@
         }
 
         select, input[type="text"], input[type="number"], input[type="date"] {
-            padding: 9px 12px;
-            border: 1px solid var(--border);
+            padding: 11px 16px;
+            border: 1px solid var(--card-border);
             border-radius: var(--radius);
-            font-size: 13px;
-            background: var(--card-bg);
+            font-size: 13.5px;
+            background: rgba(20, 23, 28, 0.8);
             color: var(--text-primary);
             outline: none;
-            transition: border-color 0.15s ease;
+            transition: all 0.2s ease;
+            font-family: inherit;
         }
 
         select:focus, input:focus {
-            border-color: var(--accent);
+            border-color: rgba(255, 255, 255, 0.25);
+            background: rgba(26, 30, 36, 0.95);
         }
 
         .btn {
-            background-color: var(--accent);
-            color: #ffffff;
+            background-color: #ffffff;
+            color: #121417;
             border: none;
-            padding: 9px 16px;
+            padding: 11px 22px;
             border-radius: var(--radius);
             cursor: pointer;
             font-size: 13px;
-            font-weight: 500;
-            transition: opacity 0.15s ease;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            transition: all 0.2s ease;
         }
 
         .btn:hover {
-            opacity: 0.9;
+            background-color: #e5e7eb;
+            transform: translateY(-1px);
         }
 
         .btn-subtle {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.05);
             color: var(--text-primary);
-            border: 1px solid var(--border);
+            border: 1px solid var(--card-border);
         }
 
         .btn-subtle:hover {
-            background: #f5f5f5;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        /* --- MINIMAL PREMIUM CARD --- */
+        /* PRO LUXURY BANNER */
         .premium-card {
-            background: #f4f4f5;
-            border: 1px solid #e4e4e7;
+            background: linear-gradient(135deg, rgba(35, 39, 47, 0.9) 0%, rgba(20, 23, 28, 0.9) 100%);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            backdrop-filter: blur(16px);
             border-radius: var(--radius);
-            padding: 20px 24px;
+            padding: 24px 28px;
             margin-bottom: 28px;
             display: flex;
             justify-content: space-between;
@@ -121,17 +153,37 @@
         }
 
         .premium-info h3 {
-            margin: 0 0 6px 0;
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: -0.01em;
+            font-family: 'Playfair Display', serif;
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            font-weight: 400;
+            color: var(--accent-gold);
+            letter-spacing: 0.02em;
         }
 
         .premium-info p {
             margin: 0;
             font-size: 13px;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             line-height: 1.5;
+        }
+
+        .btn-pro {
+            background: transparent;
+            color: var(--accent-gold);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            padding: 10px 22px;
+            border-radius: 30px;
+            font-weight: 500;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-pro:hover {
+            background: rgba(212, 175, 55, 0.1);
+            border-color: var(--accent-gold);
         }
 
         .grid {
@@ -143,19 +195,23 @@
 
         .card {
             background: var(--card-bg);
-            border: 1px solid var(--border);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
             border-radius: var(--radius);
-            padding: 20px;
+            padding: 24px;
             margin-bottom: 28px;
         }
 
         .card h3 {
-            margin: 0 0 16px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
+            font-family: 'Playfair Display', serif;
+            margin: 0 0 18px 0;
+            font-size: 18px;
+            font-weight: 400;
+            color: #ffffff;
+            letter-spacing: -0.01em;
         }
 
+        /* TABLES */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -163,15 +219,17 @@
 
         th, td {
             text-align: left;
-            padding: 12px 8px;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
+            padding: 14px 10px;
+            border-bottom: 1px solid var(--card-border);
+            font-size: 13.5px;
         }
 
         th {
-            color: var(--text-secondary);
+            color: var(--text-muted);
             font-weight: 500;
-            padding-top: 0;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
         tr:last-child td {
@@ -179,40 +237,44 @@
         }
 
         .btn-remove {
-            color: var(--text-secondary);
+            color: var(--text-muted);
             background: none;
             border: none;
             cursor: pointer;
             font-size: 12px;
             padding: 0;
+            transition: color 0.15s ease;
         }
 
         .btn-remove:hover {
-            color: var(--danger-text);
+            color: var(--danger);
         }
 
+        /* SETTLEMENTS */
         .settlement-box {
-            background: var(--success-bg);
+            background: rgba(52, 211, 153, 0.05);
+            border: 1px solid rgba(52, 211, 153, 0.2);
             border-radius: var(--radius);
-            padding: 12px 16px;
+            padding: 8px 18px;
         }
 
         .settlement-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #dcfce7;
-            font-size: 13px;
+            padding: 12px 0;
+            border-bottom: 1px dashed rgba(52, 211, 153, 0.15);
+            font-size: 13.5px;
         }
 
         .settlement-item:last-child {
             border-bottom: none;
         }
 
+        /* EXPENSE HISTORY */
         .expense-item {
-            border-bottom: 1px solid var(--border);
-            padding: 14px 0;
+            border-bottom: 1px solid var(--card-border);
+            padding: 18px 0;
         }
 
         .expense-item:last-child {
@@ -222,50 +284,52 @@
         .expense-header {
             display: flex;
             justify-content: space-between;
-            font-size: 14px;
+            font-size: 14.5px;
             font-weight: 500;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
 
         .share-list {
-            margin-top: 6px;
-            font-size: 12px;
-            color: var(--text-secondary);
+            margin-top: 8px;
+            font-size: 12.5px;
+            color: var(--text-muted);
         }
 
-        /* --- ELEGANT MODAL --- */
+        /* ELEGANT DARK MODAL */
         .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
 
         .modal-content {
-            background: var(--card-bg);
-            padding: 32px;
+            background: #181b20;
+            border: 1px solid var(--card-border);
+            padding: 36px;
             border-radius: var(--radius);
             text-align: center;
-            max-width: 360px;
-            border: 1px solid var(--border);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            max-width: 380px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
         .modal-content h2 {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            font-weight: 600;
+            font-family: 'Playfair Display', serif;
+            margin: 0 0 10px 0;
+            font-size: 22px;
+            font-weight: 400;
+            color: var(--accent-gold);
         }
 
         .modal-content p {
-            color: var(--text-secondary);
-            font-size: 13px;
-            line-height: 1.5;
-            margin: 0 0 24px 0;
+            color: var(--text-muted);
+            font-size: 13.5px;
+            line-height: 1.6;
+            margin: 0 0 28px 0;
         }
     </style>
 </head>
@@ -275,8 +339,10 @@
     <div class="header">
         <h1>SplitStay</h1>
         <div class="user-nav">
-            <span th:text="${user.name}">User</span>
-            <a href="/logout" class="logout-btn">Logout</a>
+            <div class="user-pill">
+                <span><b th:text="${user.name}">User</b></span>
+                <a href="/logout" class="logout-btn">Logout</a>
+            </div>
         </div>
     </div>
 
@@ -300,13 +366,13 @@
 
     <div th:if="${currentGroup != null}">
 
-        <!-- MINIMAL PREMIUM BANNER -->
+        <!-- PREMIUM BANNER -->
         <div class="premium-card">
             <div class="premium-info">
                 <h3>SplitStay Pro</h3>
-                <p>Verify payments via email confirmation & generate direct UPI payment links.</p>
+                <p>Double-confirmation email verifications & direct UPI payment links.</p>
             </div>
-            <button class="btn btn-subtle" onclick="showComingSoonModal()">Learn More</button>
+            <button class="btn-pro" onclick="showComingSoonModal()">Explore Pro ✨</button>
         </div>
         
         <div class="grid">
@@ -323,9 +389,9 @@
             <!-- Add Expense Form -->
             <div class="card" style="margin-bottom: 0;">
                 <h3>Add Expense</h3>
-                <form th:action="@{/expenses/add}" method="post" style="display: flex; flex-direction: column; gap: 10px;">
+                <form th:action="@{/expenses/add}" method="post" style="display: flex; flex-direction: column; gap: 12px;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
-                    <input type="text" name="description" placeholder="Description" required />
+                    <input type="text" name="description" placeholder="Description (e.g. Dinner)" required />
                     <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required />
                     <select name="paidByMemberId" required>
                         <option value="" disabled selected>Who paid?</option>
@@ -343,27 +409,27 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Name</th>
+                        <th>Member</th>
                         <th>Paid Out-of-Pocket</th>
                         <th style="text-align: right;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr th:each="stat : ${memberStats}">
-                        <td th:text="${stat.name}">Name</td>
+                        <td><b th:text="${stat.name}">Name</b></td>
                         <td th:text="'₹' + ${#numbers.formatDecimal(stat.paid, 1, 2)}">₹0.00</td>
                         <td style="text-align: right;">
                             <form th:action="@{/members/delete}" method="post" style="margin: 0;">
                                 <input type="hidden" name="memberId" th:value="${stat.id}" />
                                 <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
                                 <button type="submit" class="btn-remove" onclick="return confirm('Remove member?');">
-                                    Remove
+                                    ✖ Remove
                                 </button>
                             </form>
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(memberStats)}">
-                        <td colspan="3" style="text-align: center; color: var(--text-secondary);">No members added yet.</td>
+                        <td colspan="3" style="text-align: center; color: var(--text-muted);">No members added yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -375,28 +441,28 @@
             <div class="settlement-box" th:if="${not #lists.isEmpty(settlements)}">
                 <div th:each="s : ${settlements}" class="settlement-item">
                     <span>
-                        <span th:text="${s.fromName}">Debtor</span> owes <span th:text="${s.toName}">Creditor</span>
-                        <b style="color: var(--success-text); margin-left: 4px;" th:text="'₹' + ${#numbers.formatDecimal(s.amount, 1, 2)}">₹0.00</b>
+                        <b th:text="${s.fromName}">Debtor</b> owes <b th:text="${s.toName}">Creditor</b>: 
+                        <span style="color: var(--success); font-weight: 600; margin-left: 4px;" th:text="'₹' + ${#numbers.formatDecimal(s.amount, 1, 2)}">₹0.00</span>
                     </span>
                     <form th:action="@{/settle}" method="post" style="margin: 0;">
                         <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
                         <input type="hidden" name="fromMemberId" th:value="${s.fromId}" />
                         <input type="hidden" name="toMemberId" th:value="${s.toId}" />
                         <input type="hidden" name="amount" th:value="${s.amount}" />
-                        <button type="submit" class="btn btn-subtle" style="padding: 4px 10px; font-size: 12px; background: #fff;">
+                        <button type="submit" class="btn btn-subtle" style="padding: 6px 14px; font-size: 12px; border-color: rgba(52, 211, 153, 0.3); color: var(--success);">
                             Settle ✓
                         </button>
                     </form>
                 </div>
             </div>
-            <div th:if="${#lists.isEmpty(settlements)}" style="text-align: center; color: var(--success-text); font-size: 13px; padding: 6px 0;">
+            <div th:if="${#lists.isEmpty(settlements)}" style="text-align: center; color: var(--success); font-weight: 500; font-size: 13.5px; padding: 8px 0;">
                 All debts are settled up.
             </div>
         </div>
 
-        <!-- Clean Expense History -->
+        <!-- Expense History -->
         <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
                 <h3 style="margin: 0;">Expense History</h3>
                 <form th:action="@{/expenses/clear}" method="post" style="margin: 0;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
@@ -410,23 +476,23 @@
                 <div class="expense-header">
                     <div>
                         <span th:text="${expense.description}">Dinner</span>
-                        <span style="font-weight: normal; color: var(--text-secondary); font-size: 12px; margin-left: 6px;" th:text="${expense.date}"></span>
+                        <span style="font-weight: 400; color: var(--text-muted); font-size: 12px; margin-left: 8px;" th:text="'(' + ${expense.date} + ')'"></span>
                     </div>
-                    <div th:text="'₹' + ${#numbers.formatDecimal(expense.amount, 1, 2)}">₹0.00</div>
+                    <div style="font-weight: 600;" th:text="'₹' + ${#numbers.formatDecimal(expense.amount, 1, 2)}">₹0.00</div>
                 </div>
-                <div style="font-size: 12px; color: var(--text-secondary);">
-                    Paid by <span th:text="${memberNameMap.get(expense.paidByMemberId)}">Payer</span>
+                <div style="font-size: 12.5px; color: var(--text-muted);">
+                    Paid by <b style="color: var(--text-primary);" th:text="${memberNameMap.get(expense.paidByMemberId)}">Payer</b>
                 </div>
 
                 <div class="share-list">
                     <span th:each="share, iterStat : ${expense.shares}">
-                        <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span>: 
-                        <span th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}"></span><span th:if="${!iterStat.last}"> • </span>
+                        • <span th:text="${memberNameMap.get(share.owerMemberId)}">Ower</span> share: 
+                        <b style="color: var(--text-primary);" th:text="'₹' + ${#numbers.formatDecimal(share.shareAmount, 1, 2)}"></b>
                     </span>
                 </div>
             </div>
 
-            <div th:if="${#lists.isEmpty(currentGroup.expenses)}" style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 12px 0;">
+            <div th:if="${#lists.isEmpty(currentGroup.expenses)}" style="text-align: center; color: var(--text-muted); font-size: 13.5px; padding: 12px 0;">
                 No expenses logged yet.
             </div>
         </div>
@@ -434,12 +500,12 @@
     </div>
 </div>
 
-<!-- ELEGANT MODAL -->
+<!-- MODAL -->
 <div id="comingSoonModal" class="modal-overlay">
     <div class="modal-content">
         <h2>SplitStay Pro</h2>
-        <p>This feature is currently in development. Pro capabilities will be available in an upcoming update.</p>
-        <button class="btn" style="width: 100%;" onclick="hideComingSoonModal()">Close</button>
+        <p>Email double-confirmation verifications, direct UPI QR code generations, and PDF export reporting will arrive in the upcoming update.</p>
+        <button class="btn" style="width: 100%; padding: 11px;" onclick="hideComingSoonModal()">Understood</button>
     </div>
 </div>
 
