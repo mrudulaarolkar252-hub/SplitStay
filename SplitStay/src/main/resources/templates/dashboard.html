@@ -56,12 +56,25 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
-            transition: background 0.2s ease-in-out;
+            transition: all 0.2s ease-in-out;
         }
         .btn:hover { background-color: #2980b9; }
         .btn-success { background-color: #2ecc71; }
         .btn-success:hover { background-color: #27ae60; }
         .btn-danger { background-color: #e74c3c; }
+
+        /* --- FLOATING ACTION BUTTON (FAB) INLINE STYLING --- */
+        .btn-floating {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .btn-floating:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        }
+
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -152,7 +165,8 @@
 
         <form th:action="@{/groups/create}" method="post" style="display: flex; gap: 5px; margin-left: 20px;">
             <input type="text" name="name" placeholder="New Group Name" required />
-            <button type="submit" class="btn">+ Create Group</button>
+            <!-- Floating Create Group Button -->
+            <button type="submit" class="btn btn-floating">+ Create Group</button>
         </form>
     </div>
 
@@ -165,7 +179,8 @@
                 <form th:action="@{/members/add}" method="post" style="display: flex; gap: 8px;">
                     <input type="hidden" name="groupId" th:value="${currentGroup.id}" />
                     <input type="text" name="name" placeholder="Member Name" required style="flex: 1;" />
-                    <button type="submit" class="btn">Add</button>
+                    <!-- Floating Add Member Button -->
+                    <button type="submit" class="btn btn-floating">Add</button>
                 </form>
             </div>
 
@@ -181,7 +196,8 @@
                         <option th:each="m : ${currentGroup.members}" th:value="${m.id}" th:text="${m.name}"></option>
                     </select>
                     <input type="date" name="date" required />
-                    <button type="submit" class="btn btn-success">Add Expense</button>
+                    <!-- Floating Add Expense Button -->
+                    <button type="submit" class="btn btn-success btn-floating">Add Expense</button>
                 </form>
             </div>
         </div>
