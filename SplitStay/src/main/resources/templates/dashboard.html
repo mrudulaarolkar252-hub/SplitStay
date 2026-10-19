@@ -37,12 +37,12 @@
             margin: 0 auto;
         }
 
-        /* HEADER */
+        /* HEADER LOGO STYLING */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-bottom: 20px;
+            padding-bottom: 24px;
             margin-bottom: 32px;
             border-bottom: 1px solid var(--card-border);
         }
@@ -50,20 +50,19 @@
         .brand-container {
             display: flex;
             align-items: center;
+            gap: 12px;
         }
 
-        .brand-logo {
-            height: 52px;
+        .app-logo {
+            height: 38px;
             width: auto;
             object-fit: contain;
-            filter: drop-shadow(0 2px 8px rgba(37, 99, 235, 0.1));
         }
 
-        .fallback-title {
-            display: none;
+        .brand-container h1 {
             font-family: 'Playfair Display', serif;
             margin: 0;
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 600;
             letter-spacing: -0.01em;
             color: var(--text-primary);
@@ -342,11 +341,11 @@
 <body>
 
 <div class="container">
+    <!-- HEADER WITH LOGO -->
     <div class="header">
-        <!-- LOGO HEADER -->
         <div class="brand-container">
-            <img th:src="@{/images/logo.png}" alt="SplitStay Logo" class="brand-logo" id="dashLogo" onerror="this.style.display='none'; document.getElementById('dashFallbackTitle').style.display='block';" />
-            <h1 id="dashFallbackTitle" class="fallback-title">SplitStay</h1>
+            <img th:src="@{/images/logo.png}" alt="SplitStay Logo" class="app-logo" />
+            <h1>SplitStay</h1>
         </div>
         <div class="user-nav">
             <div class="user-pill">
