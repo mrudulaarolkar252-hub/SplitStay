@@ -1,36 +1,213 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>Login - SplitStay</title>
+    <meta charset="UTF-8">
+    <title>SplitStay — Login & Register</title>
     <style>
-        body { font-family: sans-serif; background: #f4f6f8; padding: 40px; }
-        .card { max-width: 360px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-        input, button { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
-        .error { color: red; font-size: 14px; margin-bottom: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg: #f1f5f9;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(203, 213, 225, 0.6);
+            --text-primary: #0f172a;
+            --text-muted: #64748b;
+            --accent-blue: #2563eb;
+            --accent-blue-hover: #1d4ed8;
+            --danger: #dc2626;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f1f5f9 80%);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .auth-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 40px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            text-align: center;
+        }
+
+        .brand-header {
+            margin-bottom: 24px;
+        }
+
+        .app-logo {
+            height: 48px;
+            width: auto;
+            margin-bottom: 8px;
+            object-fit: contain;
+        }
+
+        .brand-header h1 {
+            font-family: 'Playfair Display', serif;
+            margin: 0;
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .brand-header p {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .toggle-tabs {
+            display: flex;
+            background: rgba(226, 232, 240, 0.6);
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: none;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: #ffffff;
+            color: var(--text-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 16px;
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            font-size: 13.5px;
+            background: #ffffff;
+            color: var(--text-primary);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            background-color: var(--accent-blue);
+            color: #ffffff;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn:hover {
+            background-color: var(--accent-blue-hover);
+            transform: translateY(-1px);
+        }
+
+        .error-msg {
+            color: var(--danger);
+            font-size: 12.5px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-<div class="card">
-    <h2>SplitStay</h2>
-    <p th:if="${error}" class="error" th:text="${error}"></p>
-    
-    <h3>Login</h3>
-    <form action="/login" method="post">
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
+
+<div class="auth-card">
+    <div class="brand-header">
+        <img th:src="@{/images/logo.png}" alt="SplitStay Logo" class="app-logo" />
+        <h1>SplitStay</h1>
+        <p>Smart, effortless pairwise expense sharing.</p>
+    </div>
+
+    <div class="toggle-tabs">
+        <button class="tab-btn active" onclick="switchForm('login')">Login</button>
+        <button class="tab-btn" onclick="switchForm('register')">Register</button>
+    </div>
+
+    <div th:if="${error}" class="error-msg" th:text="${error}"></div>
+
+    <!-- LOGIN FORM -->
+    <form id="loginForm" th:action="@{/login}" method="post">
+        <div class="form-group">
+            <input type="email" name="email" placeholder="Email Address" required />
+        </div>
+        <div class="form-group">
+            <input type="password" name="password" placeholder="Password" required />
+        </div>
+        <button type="submit" class="btn">Sign In</button>
     </form>
 
-    <hr style="margin: 20px 0;">
-
-    <h3>Register</h3>
-    <form action="/register" method="post">
-        <input type="text" name="name" placeholder="Full Name" required>
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit" style="background:#28a745;">Register</button>
+    <!-- REGISTER FORM -->
+    <form id="registerForm" th:action="@{/register}" method="post" style="display: none;">
+        <div class="form-group">
+            <input type="text" name="name" placeholder="Full Name" required />
+        </div>
+        <div class="form-group">
+            <input type="email" name="email" placeholder="Email Address" required />
+        </div>
+        <div class="form-group">
+            <input type="password" name="password" placeholder="Password" required />
+        </div>
+        <button type="submit" class="btn">Create Account</button>
     </form>
 </div>
+
+<script>
+    function switchForm(form) {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const buttons = document.querySelectorAll('.tab-btn');
+
+        if (form === 'login') {
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+            buttons[0].classList.add('active');
+            buttons[1].classList.remove('active');
+        } else {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'block';
+            buttons[0].classList.remove('active');
+            buttons[1].classList.add('active');
+        }
+    }
+</script>
+
 </body>
 </html>
